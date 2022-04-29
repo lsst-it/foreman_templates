@@ -1,6 +1,9 @@
 <%#
+kind: snippet
 name: bmc_nic_setup
-description: |-
+model: ProvisioningTemplate
+snippet: true
+description: |
   This snippet configure BMC interfaces.
   At this time, only IPMI provider is supported.
   It was tested on some Dell hardware with CentOS 6 - CentOS 7 and should be compatible with respective
@@ -33,8 +36,6 @@ description: |-
   How to test configuration result:
   * From a remote host that can reach the current IPMI interface, install ipmitool utilities and type the following command:
     ipmitool -I <interface> -L <privilege_level> -U <user> -H <host> chassis status
-snippet: true
-model: ProvisioningTemplate
 -%>
 <%
 bmc_nic = @host.bmc_nic

@@ -1,20 +1,26 @@
+#!gpxe
 <%#
+kind: iPXE
 name: Kickstart default iPXE
-description: |-
+model: ProvisioningTemplate
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+- Fedora
+- RedHat
+- Rocky
+description: |
   The template to render iPXE installation script for kickstart based distributions
   The output is deployed on the host's subnet TFTP proxy.
   See https://ipxe.org/scripting for more details
-snippet: false
-model: ProvisioningTemplate
-kind: iPXE
-oses:
-- CentOS
-organizations:
-- LSST
-locations:
-- BDC
+test_on:
+- host4dhcp
+- host6dhcp
+- host4and6dhcp
+- host4static
+- host6static
 -%>
-#!gpxe
 <%
   iface = @host.provision_interface
   subnet4 = iface.subnet

@@ -1,9 +1,15 @@
 <%#
+kind: ptable
 name: Kickstart default thin
-snippet: false
 model: Ptable
-os_family: Redhat
--%>
+oses:
+- CentOS
+- CentOS_Stream
+- Fedora
+- RedHat
+- oVirt
+- RHVH
+%>
 zerombr
 clearpart --all --initlabel
 autopart --type=thinp <%= host_param('autopart_options') %>

@@ -1,6 +1,8 @@
 <%#
+kind: PXELinux
 name: PXELinux chain iPXE UNDI
-description: |-
+model: ProvisioningTemplate
+description: |
   Chainboots iPXE/gPXE from PXELinux via UNDI. Make sure the OS has an iPXE
   template associated and the file undionly.kpxe was copied into the TFTP
   directory as undionly-ipxe.0 (e.g. from /usr/share/ipxe/undionly.kpxe or
@@ -9,9 +11,6 @@ description: |-
 
   For more info visit:
   https://docs.theforeman.org/nightly/Provisioning_Guide/index-foreman-el.html#Configuring_Networking-Configuring_gPXE_to_Reduce_Provisioning_Times
-snippet: false
-model: ProvisioningTemplate
-kind: PXELinux
 -%>
 DEFAULT linux
 LABEL linux

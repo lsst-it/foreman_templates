@@ -1,10 +1,11 @@
 <%#
+kind: snippet
 name: http_proxy
-description: |-
+model: ProvisioningTemplate
+snippet: true
+description: |
   Configures common HTTP proxy ENV variables based on the host_proxy
   host parameter. Currently not used by any shipped template.
-snippet: true
-model: ProvisioningTemplate
 -%>
 <% if (proxy = host_param("http_proxy")) -%>
 http_proxy=<%= proxy %>

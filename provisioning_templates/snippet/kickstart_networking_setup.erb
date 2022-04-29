@@ -1,10 +1,11 @@
 <%#
 name: kickstart_networking_setup
-description: |-
+model: ProvisioningTemplate
+snippet: true
+kind: snippet
+description: |
   Generates a complete shell script that creates ifcfg configuration files for all
   host's network interfaces. Typically used on Red Hat based distributions.
-snippet: true
-model: ProvisioningTemplate
 -%>
 <%- bonded_interfaces = [] -%>
 <%- bonding_interfaces = [] -%>

@@ -19,6 +19,9 @@ template_inputs:
   resource_type: Host
   hidden_value: false
 model: ReportTemplate
+require:
+- plugin: foreman_remote_execution
+￼ version: 4.4.0
 -%>
 <%- report_headers 'Host', 'stdout', 'stderr', 'debug', 'Result', 'Finished' %>
 <%- invocation = find_job_invocation_by_id(input('job_id')) -%>

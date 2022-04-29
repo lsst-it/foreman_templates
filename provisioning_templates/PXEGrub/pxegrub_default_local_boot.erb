@@ -1,14 +1,13 @@
 <%#
+kind: PXEGrub
 name: PXEGrub default local boot
-description: |-
+model: ProvisioningTemplate
+description: |
   The template to render Grub bootloader configuration for provisioned hosts,
   that still boot from the network.
   Hosts are instructed to boot from the first local medium.
   Do not associate or change the name.
   This template is for legacy Grub 1.x, you are probably looking for Grub2.
-snippet: false
-model: ProvisioningTemplate
-kind: PXEGrub
 -%>
 <%
   # Grub1 only supports numeric default statement, this allows conversion to number. First define

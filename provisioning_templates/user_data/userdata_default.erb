@@ -1,6 +1,16 @@
 <%#
+kind: user_data
 name: UserData default
-description: |-
+model: ProvisioningTemplate
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+- Fedora
+- Rocky
+- Debian
+- Ubuntu
+description: |
   This template is used during image based provisioning, when the image is configured to use user-data.
   The output is a list of cloud-init directives that cloud-init parses to configures the VM
   booted from the image. The image must have cloud-init installed in order for this to work.
@@ -11,9 +21,6 @@ description: |-
   - package_upgrade: boolean (default=false)
   - reboot: boolean (default=false)
   - skip-puppet-setup: boolean (default=false)
-snippet: false
-model: ProvisioningTemplate
-kind: user_data
 -%>
 <%
   ssh_pwauth = host_param('ssh_pwauth') ? host_param_true?('ssh_pwauth') : !host_param('ssh_authorized_keys')

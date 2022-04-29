@@ -1,19 +1,18 @@
+#!/bin/bash
 <%#
+kind: script
 name: Grubby default
-description: |-
+model: ProvisioningTemplate
+description: |
   Script that can be manually downloaded to a server to reprovision it without booting from network.
   Grubby compatibility package must be installed. WARNING: It will immediately reconfigure
   bootloader and reprovision the node.
-
+  
   Usage:
   curl https://foreman/unattended/script -o reprovision.sh
   bash reprovision.sh
   reboot
-snippet: false
-model: ProvisioningTemplate
-kind: script
 -%>
-#!/bin/bash
 
 KERNEL="/boot/kernel"
 INITRD="/boot/initrd.img"

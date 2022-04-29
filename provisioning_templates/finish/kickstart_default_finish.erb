@@ -1,6 +1,14 @@
 <%#
+kind: finish
 name: Kickstart default finish
-description: |-
+model: ProvisioningTemplate
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+- Fedora
+- Rocky
+description: |
   A finish template executed at the end of the image based provisioning
   using the image without user data. Foreman connects to the VM over SSH
   and runs the script rendered from this template. It is meant to be run
@@ -14,9 +22,6 @@ description: |-
   - ntp-server: string (default=undef)
   - package_upgrade: boolean (default=true)
   - salt_master: string (default=undef)
-snippet: false
-model: ProvisioningTemplate
-kind: finish
 -%>
 <%
   rhel_compatible = @host.operatingsystem.family == 'Redhat' && @host.operatingsystem.name != 'Fedora'

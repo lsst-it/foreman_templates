@@ -1,6 +1,9 @@
 <%#
+kind: snippet
 name: remote_execution_ssh_keys
-description: |-
+model: ProvisioningTemplate
+snippet: true
+description: |
   SSH keys setup snippet for Remote Execution plugin
 
   Parameters:
@@ -23,8 +26,6 @@ description: |-
   To use this snippet without the plugin provide the SSH keys as host parameter
   remote_execution_ssh_keys. It expects the same format like the authorized_keys
   file.
-snippet: true
-model: ProvisioningTemplate
 -%>
 
 <% if !host_param('remote_execution_ssh_keys').blank? %>

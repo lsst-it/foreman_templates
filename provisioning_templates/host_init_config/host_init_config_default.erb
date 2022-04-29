@@ -1,6 +1,16 @@
 <%#
+kind: host_init_config
 name: Linux host_init_config default
-description: |-
+model: ProvisioningTemplate
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+- Fedora
+- Rocky
+- Debian
+- Ubuntu
+description: |
   This template is used during the host registration to perform the initial host configuration. After the host
   is created by starting the registration, the registration script asks for the host init config script, that
   is rendered based on this template. It is rendered for the specific host therefore it contains instructions
@@ -9,12 +19,6 @@ description: |-
   It deploys the CA certificate so any later communication with the Foreman is TLS secured. Then it
   performs initial steps, such as puppet deployment, remote execution SSH key configuration etc. At the end
   it informs Foreman that provisioning has finished.
-snippet: false
-model: ProvisioningTemplate
-kind: host_init_config
-oses:
-- Alma
-- CentOS
 -%>
 <% built_https = foreman_url('built').start_with?('https') -%>
 #!/bin/bash

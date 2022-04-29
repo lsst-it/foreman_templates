@@ -1,18 +1,24 @@
 <%#
+kind: PXEGrub
 name: Kickstart default PXEGrub
-description: |-
+model: ProvisioningTemplate
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+- Fedora
+- RedHat
+- Rocky
+description: |
   The template to render Grub bootloader configuration for kickstart based distributions.
   The output is deployed on the host's subnet TFTP proxy.
   This template is for legacy Grub 1.x, you are probably looking for Grub2.
-snippet: false
-model: ProvisioningTemplate
-kind: PXEGrub
-oses:
-- CentOS
-organizations:
-- LSST
-locations:
-- BDC
+test_on:
+- host4dhcp
+- host6dhcp
+- host4and6dhcp
+- host4static
+- host6static
 -%>
 # This file was deployed via '<%= template_name %>' template
 

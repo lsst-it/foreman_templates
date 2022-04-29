@@ -1,15 +1,12 @@
 <%#
+kind: snippet
 name: pkg_manager
-description: |-
+model: ProvisioningTemplate
+snippet: true
+description: |
   Select package manager for the OS. Snippet sets the package manager
   in the PKG_MANAGER env variable so it can be used in templates like this:
   $PKG_MANAGER install -y pkg1 pkg2
-snippet: true
-model: ProvisioningTemplate
-organizations:
-- LSST
-locations:
-- BDC
 -%>
 
 if [ -f /etc/os-release ] ; then

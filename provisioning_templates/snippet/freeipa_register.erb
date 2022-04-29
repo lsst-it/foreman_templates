@@ -1,6 +1,9 @@
 <%#
+kind: snippet
 name: freeipa_register
-description: |-
+model: ProvisioningTemplate
+snippet: true
+description: |
   Installs IPA client and enrolls the host in IPA realm using the OTP
   Optional parameters:
     freeipa_server              IPA server
@@ -14,8 +17,6 @@ description: |-
                                 Default: true
     freeipa_opts                Additional options to pass directly to installer
     freeipa_automount_server    Override automount server if freeipa_automount is true and the server differs from freeipa_server
-snippet: true
-model: ProvisioningTemplate
 -%>
 <% if @host.operatingsystem.family == 'Redhat' -%>
   <% if @host.operatingsystem.name == 'Fedora' -%>

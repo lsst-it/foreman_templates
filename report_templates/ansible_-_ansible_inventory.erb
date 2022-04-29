@@ -7,121 +7,106 @@ template_inputs:
   required: true
   input_type: user
   description: Whether should be Organization included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'yes'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "yes"
 - name: Location
   required: true
   input_type: user
   description: Whether should be Location included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'yes'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "yes"
 - name: Host Group
   required: true
   input_type: user
   description: Whether should be Host Group included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'yes'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "yes"
 - name: Host Collections
   required: true
   input_type: user
-  description: Whether should be Host Collections included. Ignored when Katello is
-    not available.
-  options: "yes\r\nno"
+  description: Whether should be Host Collections included. Ignored when Katello is not available.
   advanced: false
   value_type: plain
-  default: 'yes'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "yes"
 - name: Host Parameters
   required: true
   input_type: user
   description: Whether should be Host Parameters included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'no'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "no"
 - name: IPv4
   required: true
   input_type: user
   description: Whether should be IPv4 included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'yes'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "yes"
 - name: IPv6
   required: true
   input_type: user
   description: Whether should be IPv6 included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'no'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "no"
 - name: Subnet
   required: true
   input_type: user
   description: Whether should be Subnet included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'yes'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "yes"
 - name: Subnet v6
   required: true
   input_type: user
   description: Whether should be Subnet v6 included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'no'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "no"
 - name: Smart Proxies
   required: true
   input_type: user
   description: Whether should be Smart Proxies included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'yes'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "yes"
 - name: Content Attributes
   required: true
   input_type: user
-  description: Whether should be Content Attributes included. Ignored when Katello
-    is not available.
-  options: "yes\r\nno"
+  description: Whether should be Content Attributes included. Ignored when Katello is not available.
   advanced: false
   value_type: plain
-  default: 'no'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "no"
 - name: Facts
   required: true
   input_type: user
   description: Whether should be Facts included.
-  options: "yes\r\nno"
   advanced: false
   value_type: plain
-  default: 'no'
-  hidden_value: false
+  options: "yes\r\nno"
+  default: "no"
 - name: Hosts
   required: false
   input_type: user
-  description: Limit the report only on hosts found by this search query. Keep empty
-    for report on all available hosts.
+  description: Limit the report only on hosts found by this search query. Keep
+    empty for report on all available hosts.
   advanced: false
   value_type: search
   resource_type: Host
-  hidden_value: false
 model: ReportTemplate
 -%>
 <%- report_headers 'id', 'name' -%>
