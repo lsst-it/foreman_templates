@@ -1,0 +1,49 @@
+<%#
+name: Service Action - SSH Default
+snippet: false
+template_inputs:
+- name: action
+  required: true
+  input_type: user
+  description: Action to perform on the service
+  options: |-
+    restart
+    start
+    stop
+    status
+    reload
+    enable
+    disable
+  advanced: false
+  value_type: plain
+  hidden_value: false
+- name: service
+  required: true
+  input_type: user
+  description: Name of the service
+  advanced: false
+  value_type: plain
+  hidden_value: false
+model: JobTemplate
+job_category: Services
+description_format: "%{action} service %{service}"
+provider_type: SSH
+kind: job_template
+organizations:
+- LSST
+locations:
+- BDC
+%>
+
+<% if @host.operatingsystem.family == "Redhat" && @host.operatingsystem.major.to_i > 6 %>
+systemctl <%= input("action") %> <%= input("service") %>
+<% else %>
+  <% case input("action")
+  when 'enable' %>
+chkconfig --add <%= input("service") %>
+  <% when 'disable' %>
+chkconfig --del <%= input("service") %>
+  <% else %>
+service <%= input("service") %> <%= input("action") %>
+  <% end %>
+<% end -%>

@@ -1,0 +1,15 @@
+<%#
+name: CoreOS PXELinux
+description: |-
+  The template to render PXELinux bootloader configuration for CoreOS Container Linux distribution.
+  This does not work for Fedora CoreOS or Flatcar Container Linux, which use Ignition instead
+  The output is deployed on the host's subnet TFTP proxy.
+snippet: false
+model: ProvisioningTemplate
+kind: PXELinux
+-%>
+DEFAULT coreos
+
+LABEL coreos
+    KERNEL <%= @kernel %>
+    APPEND initrd=<%= @initrd %> cloud-config-url=<%= foreman_url('provision')%>

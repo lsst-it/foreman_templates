@@ -1,0 +1,12 @@
+<%#
+name: XenServer default finish
+description: |-
+  The finish template executed at the end of XenServer provisioning informing Foreman, that provisioning
+  is complete. It reboots the machine afterwards. Meant for use with XenServer or Citrix Hypervisor
+snippet: false
+model: ProvisioningTemplate
+kind: finish
+-%>
+#!/bin/bash
+<%= snippet 'built' %>
+<%= snippet 'schedule_reboot' -%>

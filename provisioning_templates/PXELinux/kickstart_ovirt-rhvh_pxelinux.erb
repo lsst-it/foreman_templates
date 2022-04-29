@@ -1,0 +1,15 @@
+<%#
+name: Kickstart oVirt-RHVH PXELinux
+description: |-
+  The template to render PXELinux bootloader configuration for oVirt Node or Red Hat Virtualization Host.
+  The output is deployed on the host's subnet TFTP proxy.
+snippet: false
+model: ProvisioningTemplate
+kind: PXELinux
+-%>
+DEFAULT rhvh
+
+LABEL rhvh
+KERNEL <%= @kernel %>
+APPEND initrd=<%= @initrd %> inst.ks=<%= foreman_url("provision") %> inst.stage2=<%= medium_uri %> local_boot_trigger=<%= foreman_url("built") %> intel_iommu=on
+IPAPPEND 2

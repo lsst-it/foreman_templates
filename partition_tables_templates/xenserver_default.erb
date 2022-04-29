@@ -1,0 +1,11 @@
+<%#
+name: XenServer default
+snippet: false
+model: Ptable
+os_family: Xenserver
+-%>
+<%
+  gueststorage = host_param('gueststorage') || 'yes'
+  primary_disk = host_param('install-disk') || 'sda'
+-%>
+  <primary-disk gueststorage="<%= gueststorage %>"><%= primary_disk %></primary-disk>

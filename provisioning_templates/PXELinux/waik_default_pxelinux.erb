@@ -1,0 +1,14 @@
+<%#
+name: WAIK default PXELinux
+description: |-
+  The template to render PXELinux bootloader configuration for Windows.
+  It is used to boot the Windows PE that is then used to install Windows.
+  The output is deployed on the host's subnet TFTP proxy.
+snippet: false
+model: ProvisioningTemplate
+kind: PXELinux
+-%>
+DEFAULT winPE
+
+LABEL winPE
+    KERNEL /Boot/startrom.0
