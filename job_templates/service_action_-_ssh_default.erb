@@ -29,10 +29,6 @@ job_category: Services
 description_format: "%{action} service %{service}"
 provider_type: SSH
 kind: job_template
-organizations:
-- LSST
-locations:
-- BDC
 %>
 
 <% if @host.operatingsystem.family == "Redhat" && @host.operatingsystem.major.to_i > 6 %>
