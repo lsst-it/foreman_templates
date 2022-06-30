@@ -1,0 +1,41 @@
+<%#
+kind: ptable
+name: kickstart boot+data by-id
+model: Ptable
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+- Fedora
+- RedHat
+- Rocky
+%>
+
+#Dynamic
+
+# run `nc -k -l 8999` on foreman host to capture disk information
+hostname -f | nc <%= foreman_server_fqdn %> 8999 || true
+ls -laR /dev/disk | nc <%= foreman_server_fqdn %> 8999 || true
+
+BOOT_DEV="/dev/disk/by-id/<%= host_param('boot_disk_id') %>"
+BOOT_VG="centos_$(hostname -s)"
+
+DATA_DEV="/dev/disk/by-id/<%= host_param('data_disk_id') %>"
+DATA_VG="data_$(hostname -s)"
+
+cat <<EOF > /tmp/diskpart.cfg
+ignoredisk --only-use=${BOOT_DEV},${DATA_DEV}
+zerombr
+clearpart --drives=${BOOT_DEV},${DATA_DEV} --all --initlabel --disklabel=gpt
+
+part /boot     --size=1024 --asprimary --ondrive=${BOOT_DEV} --fstype=ext4
+part /boot/efi --size=200  --asprimary --ondrive=${BOOT_DEV} --fstype=efi
+part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV} --fstype=ext4
+part pv.auxtel --size=1 --grow --ondisk=${DATA_DEV}
+
+volgroup ${BOOT_VG} pv.boot
+volgroup ${DATA_VG} pv.auxtel
+
+logvol /           --vgname=${BOOT_VG} --size=51200 --name=root
+logvol /daq/auxtel --vgname=${DATA_VG} --size=1 --grow --name=auxtel
+EOF

@@ -1,0 +1,47 @@
+<%#
+name: kickstart daq-mgt by-id
+snippet: false
+model: Ptable
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+- Fedora
+- RedHat
+- Rocky
+-%>
+
+#Dynamic
+
+# run `nc -k -l 8999` on foreman host to capture disk information
+hostname -f | nc <%= foreman_server_fqdn %> 8999 || true
+ls -laR /dev/disk | nc <%= foreman_server_fqdn %> 8999 || true
+
+BOOT_DEV="/dev/disk/by-id/<%= host_param('boot_disk_id') %>"
+BOOT_VG="centos_$(hostname -s)"
+
+AUXTEL_DEV="/dev/disk/by-id/<%= host_param('auxtel_disk_id') %>"
+AUXTEL_VG="auxtel_$(hostname -s)"
+
+COMCAM_DEV="/dev/disk/by-id/<%= host_param('comcam_disk_id') %>"
+COMCAM_VG="comcam_$(hostname -s)"
+
+cat <<EOF > /tmp/diskpart.cfg
+ignoredisk --only-use=${BOOT_DEV},${AUXTEL_DEV},${COMCAM_DEV}
+zerombr
+clearpart --drives=${BOOT_DEV},${AUXTEL_DEV},${COMCAM_DEV} --all --initlabel --disklabel=gpt
+
+part /boot     --size=1024 --asprimary --ondrive=${BOOT_DEV} --fstype=ext4
+part /boot/efi --size=200  --asprimary --ondrive=${BOOT_DEV} --fstype=efi
+part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV} --fstype=ext4
+part pv.auxtel --size=1 --grow --ondisk=${AUXTEL_DEV}
+part pv.comcam --size=1 --grow --ondisk=${COMCAM_DEV}
+
+volgroup ${BOOT_VG} pv.boot
+volgroup ${AUXTEL_VG} pv.auxtel
+volgroup ${COMCAM_VG} pv.comcam
+
+logvol /           --vgname=${BOOT_VG} --size=51200 --name=root
+logvol /daq/auxtel --vgname=${AUXTEL_VG} --size=1 --grow --name=auxtel
+logvol /daq/comcam --vgname=${COMCAM_VG} --size=1 --grow --name=comcam
+EOF

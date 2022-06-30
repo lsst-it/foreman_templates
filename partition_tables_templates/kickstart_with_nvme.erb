@@ -1,0 +1,22 @@
+<%#
+name: Kickstart with nvme
+snippet: false
+model: Ptable
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+- Fedora
+- RedHat
+- Rocky
+%>
+zerombr
+clearpart --all --initlabel --drives=sda,sdb,nvme0n1 --disklabel=gpt
+part /boot --fstype ext4 --size=500 --ondisk=sda --asprimary
+part /boot/efi --fstype efi --size=1024
+part pv.01  --size=1 --grow --ondisk=sda
+part pv.02  --size=1 --grow --ondisk=nvme0n1
+volgroup vg_primary pv.01
+volgroup vg_secondary pv.02
+logvol / --vgname=vg_primary  --fstype=xfs  --size=<%= 1024 * 200 %> --name=lv_root
+logvol /vm --vgname=vg_secondary --fstype=xfs --size=1024 --grow --name=lv_vm
