@@ -12,7 +12,7 @@ description: |
   below. This will not be fixed until RHEL8 due to prevent breaking changes for
   existing systems. See RHBZ#1259015 for more details.
 -%>
-common="rootflags=loop root=live:/fdi.iso rootfstype=auto ro rd.live.image acpi=force rd.luks=0 rd.md=0 rd.dm=0 rd.lvm=0 rd.bootif=0 rd.neednet=0 nokaslr nomodeset proxy.url=<%= foreman_server_url %> proxy.type=foreman BOOTIF=01-$net_default_mac"
+common="rootflags=loop root=live:/fdi.iso rootfstype=auto ro rd.live.image acpi=force rd.luks=0 rd.md=0 rd.dm=0 rd.lvm=0 rd.bootif=0 rd.neednet=0 nokaslr nomodeset proxy.url=<%= foreman_server_url %> proxy.type=foreman BOOTIF=01-$net_default_mac fdi.zips=boot/udev_fact.zip"
 
 if [ ${grub_platform} == "pc" ]; then
   menuentry 'Foreman Discovery Image' --id discovery {
