@@ -49,5 +49,5 @@ logvol /var            --vgname=${BOOT_VG} --size=<%= host_param('var_lv_size') 
 <% if host_param('docker_lv_size') -%>
 logvol /var/lib/docker --vgname=${BOOT_VG} --size=<%= host_param('docker_lv_size') %> --name=docker
 <% end -%>
-logvol ${DATA_PATH}    --vgname=${DATA_VG} --size=1 --grow --name=data
+logvol ${DATA_PATH}    --vgname=${DATA_VG} --size=1 --grow --name=data --fstype=xfs
 EOF
