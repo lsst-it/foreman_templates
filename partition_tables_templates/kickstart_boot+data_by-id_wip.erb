@@ -39,7 +39,7 @@ part pv.data   --size=1 --grow --ondisk=${DATA_DEV}
 volgroup ${BOOT_VG} pv.boot
 volgroup ${DATA_VG} pv.data
 
-logvol /               --vgname=${BOOT_VG} --size=51200 --name=root --fstype=ext4
+logvol /               --vgname=${BOOT_VG} --size=<%= host_param('root_lv_size') or 51200 %> --name=root --fstype=ext4
 <% if host_param('home_lv_size') -%>
 logvol /home           --vgname=${BOOT_VG} --size=<%= host_param('home_lv_size') %> --name=home --fstype=ext4
 <% end -%>
