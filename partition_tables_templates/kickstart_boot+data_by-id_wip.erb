@@ -20,7 +20,7 @@ ls -laR /dev/disk | nc <%= foreman_server_fqdn %> 8999 || true
 echo "###" | nc <%= foreman_server_fqdn %> 8999 || true
 
 BOOT_DEV="/dev/disk/by-id/<%= host_param('boot_disk_id') %>"
-BOOT_VG="centos_$(hostname -s)"
+BOOT_VG="boot_$(hostname -s)"
 
 DATA_DEV="/dev/disk/by-id/<%= host_param('data_disk_id') %>"
 DATA_VG="data_$(hostname -s)"
