@@ -1,0 +1,30 @@
+<%#
+name: Kickstart nvme only -- no  swap no home
+snippet: false
+model: Ptable
+os_family: Redhat
+organizations:
+- LSST
+locations:
+- BDC Servers
+- BTS
+-%>
+#Dynamic
+
+
+BOOT_VG="boot_$(hostname -s)"
+
+BOOT_DEV=nvme0n1
+
+cat <<EOF > /tmp/diskpart.cfg
+ignoredisk --only-use=${BOOT_DEV}
+zerombr
+clearpart --drives=${BOOT_DEV} --all --initlabel
+
+part /boot     --size=1024 --asprimary --ondrive=${BOOT_DEV}
+part /boot/efi --size=200  --asprimary --ondrive=${BOOT_DEV} --fstype=efi
+part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV}
+volgroup ${BOOT_VG} pv.boot
+
+logvol /               --vgname=${BOOT_VG} --size=1 --grow --name=root
+EOF

@@ -1,0 +1,34 @@
+<%#
+name: BTS nvme1n1 OS, nvme0n1 -- no  swap no home
+snippet: false
+model: Ptable
+os_family: Redhat
+organizations:
+- LSST
+locations:
+- BDC Servers
+- BTS
+-%>
+#Dynamic
+
+BOOT_VG="almalinux_$(hostname -s)"
+BOOT_DEV=nvme1n1
+DATA_VG="data_$(hostname -s)"
+DATA_DEV=nvme0n1
+
+cat <<EOF > /tmp/diskpart.cfg
+ignoredisk --only-use=${BOOT_DEV},${DATA_DEV}
+zerombr
+clearpart --drives=${BOOT_DEV},${DATA_DEV} --all --initlabel --disklabel=gpt
+
+part /boot     --size=1024 --asprimary --ondrive=${BOOT_DEV} --fstype=ext4
+part /boot/efi --size=200  --asprimary --ondrive=${BOOT_DEV} --fstype=efi
+part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV} --fstype=xfs
+part pv.data   --size=1 --grow --ondisk=${DATA_DEV} --fstype=xfs
+
+volgroup ${BOOT_VG} pv.boot
+volgroup ${DATA_VG} pv.data
+
+logvol /         --vgname=${BOOT_VG} --size=1 --grow --name=root
+logvol /vms-data --vgname=${DATA_VG} --size=1 --grow --name=data
+EOF

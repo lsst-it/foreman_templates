@@ -1,0 +1,20 @@
+<%#
+name: os update prepare
+snippet: false
+model: JobTemplate
+job_category: Miscellaneous
+provider_type: SSH
+kind: job_template
+organizations:
+- LSST
+locations:
+- archive
+- BDC Servers
+- comcam-ccs
+%>
+
+set -x
+yum-complete-transaction --cleanup-only || true
+yum clean all || true
+puppet agent -t
+yum update -y --downloadonly
