@@ -22,7 +22,7 @@ echo "###" | nc <%= foreman_server_fqdn %> 8999 || true
 BOOT_DEV="/dev/disk/by-id/<%= host_param('boot_disk_id') %>"
 BOOT_VG="boot_$(hostname -s)"
 
-<% if host_param('data_disk_id') %>"
+<% if host_param('data_disk_id') %>
 DATA_DEV="/dev/disk/by-id/<%= host_param('data_disk_id') %>"
 DATA_VG="data_$(hostname -s)"
 DATA_PATH="<%= host_param('data_path') or '/data' %>"
@@ -41,7 +41,7 @@ part /boot/efi --size=200  --asprimary --ondrive=${BOOT_DEV} --fstype=efi
 part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV}
 volgroup ${BOOT_VG} pv.boot
 
-<% if host_param('data_disk_id') %>"
+<% if host_param('data_disk_id') %>
 part pv.data   --size=1 --grow --ondisk=${DATA_DEV}
 volgroup ${DATA_VG} pv.data
 <% end %>
@@ -56,7 +56,7 @@ logvol /var            --vgname=${BOOT_VG} --size=<%= host_param('var_lv_size') 
 <% if host_param('docker_lv_size') -%>
 logvol /var/lib/docker --vgname=${BOOT_VG} --size=<%= host_param('docker_lv_size') %> --name=docker
 <% end -%>
-<% if host_param('data_disk_id') %>"
+<% if host_param('data_disk_id') %>
 logvol ${DATA_PATH}    --vgname=${DATA_VG} --size=1 --grow --name=data --fstype=xfs
 <% end %>
 EOF
