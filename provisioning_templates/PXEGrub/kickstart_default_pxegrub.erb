@@ -1,0 +1,24 @@
+<%#
+name: Kickstart default PXEGrub
+description: |-
+  The template to render Grub bootloader configuration for kickstart based distributions.
+  The output is deployed on the host's subnet TFTP proxy.
+  This template is for legacy Grub 1.x, you are probably looking for Grub2.
+snippet: false
+model: ProvisioningTemplate
+kind: PXEGrub
+oses:
+- AlmaLinux
+- CentOS
+-%>
+# This file was deployed via '<%= template_name %>' template
+
+default=0
+timeout=<%= host_param('loader_timeout') || 10 %>
+
+title <%= template_name %>
+  root (nd)
+  kernel (nd)/../<%= @kernel %> <%= pxe_kernel_options %> <%= snippet("kickstart_kernel_options").strip %>
+  initrd (nd)/../<%= @initrd %>
+
+<%= snippet_if_exists(template_name + " custom menu") %>
