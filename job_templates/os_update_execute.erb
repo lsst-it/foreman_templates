@@ -1,0 +1,18 @@
+<%#
+name: os update execute
+snippet: false
+model: JobTemplate
+job_category: update
+provider_type: SSH
+kind: job_template
+organizations:
+- LSST
+locations:
+- ccs
+- Summit_Servers
+%>
+
+set -e
+systemctl stop puppet
+yum update -y
+reboot

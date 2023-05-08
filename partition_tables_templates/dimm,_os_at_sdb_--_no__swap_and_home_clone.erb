@@ -1,0 +1,35 @@
+<%#
+name: Dimm, OS at sdb -- no  swap and home clone
+snippet: false
+model: Ptable
+os_family: Redhat
+-%>
+#Dynamic
+
+
+BOOT_VG="almalinux_$(hostname -s)"
+HOME_VG="home_$(hostname -s)"
+DATA_VG="data_$(hostname -s)"
+
+BOOT_DEV=sdb
+HOME_DEV=sda
+DATA_DEV=sdc
+
+cat <<EOF > /tmp/diskpart.cfg
+ignoredisk --only-use=${BOOT_DEV},${HOME_DEV},${DATA_DEV}
+zerombr
+clearpart --drives=${BOOT_DEV},${HOME_DEV},${DATA_DEV} --all --initlabel
+
+part /boot     --size=1024 --asprimary --ondrive=${BOOT_DEV}
+part /boot/efi --size=200  --asprimary --ondrive=${BOOT_DEV} --fstype=efi
+part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV}
+part pv.home   --size=1 --grow --ondisk=${HOME_DEV}
+part pv.data   --size=1 --grow --ondisk=${DATA_DEV}
+volgroup ${BOOT_VG} pv.boot
+volgroup ${HOME_VG} pv.home
+volgroup ${DATA_VG} pv.data
+
+logvol /      --vgname=${BOOT_VG} --size=1 --grow --name=root
+logvol /home  --vgname=${HOME_VG} --size=1 --grow --name=home
+logvol /data  --vgname=${DATA_VG} --size=1 --grow --name=data
+EOF

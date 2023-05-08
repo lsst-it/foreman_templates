@@ -1,0 +1,34 @@
+<%#
+name: yagan09 - kickstart boot+docker
+snippet: false
+model: Ptable
+os_family: Redhat
+organizations:
+- LSST
+locations:
+- Summit_Servers
+-%>
+#Dynamic
+
+
+BOOT_VG="centos_$(hostname -s)"
+DOCKER_VG="docker_$(hostname -s)"
+BOOT_DEV="/dev/disk/by-id/nvme-Samsung_SSD_980_PRO_500GB_S5NYNG0NC07505L"
+DOCKER_DEV="/dev/disk/by-id/nvme-MTFDHAL1T9TCT_190620D57167"
+
+cat <<EOF > /tmp/diskpart.cfg
+ignoredisk --only-use=${BOOT_DEV},${DOCKER_DEV}
+zerombr
+clearpart --drives=/dev/nvme0n1,/dev/nvme1n1,/dev/nvme2n1,/dev/nvme3n1,/dev/nvme4n1,/dev/nvme5n1 --all --initlabel --disklabel=gpt
+
+part /boot     --size=1024 --asprimary --ondrive=${BOOT_DEV} --fstype=ext4
+part /boot/efi --size=200  --asprimary --ondrive=${BOOT_DEV} --fstype=efi
+part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV} --fstype=ext4
+part pv.docker   --size=1 --grow --ondisk=${DOCKER_DEV} --fstype=ext4
+
+volgroup ${BOOT_VG} pv.boot
+volgroup ${DOCKER_VG} pv.docker
+
+logvol /               --vgname=${BOOT_VG} --size=1 --grow --name=root
+logvol /var/lib/docker --vgname=${DOCKER_VG} --size=1 --grow --name=docker
+EOF

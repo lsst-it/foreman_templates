@@ -1,0 +1,13 @@
+<%#
+name: purge unused partition tables
+description: purge all partition table templates not associated with a host/hostgroup
+  from foreman
+snippet: false
+model: JobTemplate
+job_category: Miscellaneous
+provider_type: SSH
+kind: job_template
+%>
+
+hammer --output=json partition-table list | jq '.[].Id' | xargs -L1 hammer partition-table update --locked false --id
+hammer --output=json partition-table list | jq '.[].Id' | xargs -L1 hammer partition-table delete --id

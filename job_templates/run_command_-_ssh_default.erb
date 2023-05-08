@@ -1,0 +1,25 @@
+<%#
+name: Run Command - SSH Default
+snippet: false
+template_inputs:
+- name: command
+  required: true
+  input_type: user
+  description: Command to run on the host
+  advanced: false
+  value_type: plain
+  hidden_value: false
+model: JobTemplate
+job_category: Commands
+description_format: Run %{command}
+provider_type: SSH
+kind: job_template
+organizations:
+- LSST
+locations:
+- ccs
+- daq
+- Summit_Servers
+%>
+
+<%= input("command") %>

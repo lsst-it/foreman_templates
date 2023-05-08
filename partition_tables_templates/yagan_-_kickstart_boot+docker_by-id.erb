@@ -1,0 +1,34 @@
+<%#
+name: yagan - kickstart boot+docker by-id
+snippet: false
+model: Ptable
+os_family: Redhat
+organizations:
+- LSST
+locations:
+- Summit_Servers
+-%>
+#Dynamic
+
+
+BOOT_VG="centos_$(hostname -s)"
+DOCKER_VG="docker_$(hostname -s)"
+BOOT_DEV="/dev/disk/by-id/$(ls /dev/disk/by-id/ | grep 500GB | grep -v part)"
+DOCKER_DEV="/dev/disk/by-id/$(ls /dev/disk/by-id/ | grep MZQLB1T9HAJR-00007 | head -n1)"
+
+cat <<EOF > /tmp/diskpart.cfg
+ignoredisk --only-use=${BOOT_DEV},${DOCKER_DEV}
+zerombr
+clearpart --drives=${BOOT_DEV},${DOCKER_DEV} --all --initlabel --disklabel=gpt
+
+part /boot     --size=1024 --asprimary --ondrive=${BOOT_DEV} --fstype=ext4
+part /boot/efi --size=200  --asprimary --ondrive=${BOOT_DEV} --fstype=efi
+part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV} --fstype=ext4
+part pv.docker   --size=1 --grow --ondisk=${DOCKER_DEV} --fstype=ext4
+
+volgroup ${BOOT_VG} pv.boot
+volgroup ${DOCKER_VG} pv.docker
+
+logvol /               --vgname=${BOOT_VG} --size=1 --grow --name=root
+logvol /var/lib/docker --vgname=${DOCKER_VG} --size=1 --grow --name=docker
+EOF
