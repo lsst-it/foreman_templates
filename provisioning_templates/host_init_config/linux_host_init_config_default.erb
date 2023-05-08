@@ -1,0 +1,90 @@
+<%#
+name: Linux host_init_config default
+description: |-
+  This template is used during the host registration to perform the initial host configuration. After the host
+  is created by starting the registration, the registration script asks for the host init config script, that
+  is rendered based on this template. It is rendered for the specific host therefore it contains instructions
+  specific for the OS of the host. It's content can differ based on any parameters applicable for the host.
+
+  It deploys the CA certificate so any later communication with the Foreman is TLS secured. Then it
+  performs initial steps, such as puppet deployment, remote execution SSH key configuration etc. At the end
+  it informs Foreman that provisioning has finished.
+snippet: false
+model: ProvisioningTemplate
+kind: host_init_config
+oses:
+- AlmaLinux
+- CentOS
+locations:
+- Tucson
+-%>
+<% built_https = foreman_url('built').start_with?('https') -%>
+#!/bin/bash
+set -e
+
+echo "# Running [<%= @host.name %>] host initial configuration"
+
+<% if built_https -%>
+SSL_CA_CERT=$(mktemp)
+cat << EOF > $SSL_CA_CERT
+<%= foreman_server_ca_cert %>
+EOF
+<% end -%>
+
+foreman_curl() {
+  curl --silent --show-error <%= '--cacert $SSL_CA_CERT' if built_https %> -o /dev/null --noproxy \* "$@"
+}
+
+exit_and_cancel_build() {
+  echo 'Host [<%= @host.name %>] initial configuration failed'
+  foreman_curl --request POST '<%= foreman_url('failed') %>' \
+       --data 'Host initial configuration failed, please see the registration log for more details.'
+  exit 1
+}
+
+set +e
+trap 'exit_and_cancel_build' ERR
+
+<% if !host_param_true?('skip-puppet-setup') && (host_puppet_server.present? || host_param_true?('force-puppet')) -%>
+<%= snippet 'puppetlabs_repo' %>
+<%= snippet 'puppet_setup' %>
+<% end -%>
+
+<% if host_param_true?('host_registration_remote_execution') -%>
+<%= snippet 'remote_execution_ssh_keys' %>
+
+<% end -%>
+
+<%= install_packages(host_param('host_packages')) -%>
+
+<% if host_param_true?('host_registration_insights') -%>
+<%= snippet 'insights' %>
+
+<% end -%>
+
+<% if plugin_present?('katello') && @host.operatingsystem.family == 'Redhat' -%>
+echo "Refreshing subscription data"
+subscription-manager refresh
+
+<% end -%>
+<%= update_packages if host_param_true?('host_update_packages') -%>
+
+<%= snippet_if_exists('host_init_config_post') -%>
+
+# Call home to exit build mode
+
+trap - ERR
+foreman_curl '<%= foreman_url('built') %>'
+
+if [[ $? == 0 ]] ; then
+  echo "Host [<%= @host.name %>] successfully configured."
+else
+  echo "Host [<%= @host.name %>] successfully configured, but failed to set built status."
+fi
+
+<% if plugin_present?('katello') && @host.operatingsystem.family == 'Redhat' -%>
+subscription-manager facts --update
+
+<% end -%>
+
+exit 0

@@ -1,0 +1,21 @@
+<%#
+name: os update all-in-one
+snippet: false
+model: JobTemplate
+job_category: update
+provider_type: SSH
+kind: job_template
+%>
+
+set -x
+yum-complete-transaction --cleanup-only || true
+yum clean all || true
+puppet agent -t || true
+rm -f /etc/yum.repos.d/*
+puppet agent -t
+yum update -y --downloadonly
+
+set -ex
+systemctl stop puppet
+yum update -y
+reboot

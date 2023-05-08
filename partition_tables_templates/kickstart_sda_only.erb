@@ -1,0 +1,16 @@
+<%#
+name: Kickstart sda only
+snippet: false
+model: Ptable
+os_family: Redhat
+organizations:
+- LSST
+locations:
+- Tucson
+-%>
+
+# XXX repalce with kickstart_default table w/ ignoredisk_options host_param
+ignoredisk --only-use=sda
+zerombr
+clearpart --all --initlabel
+autopart <%= host_param('autopart_options') %>
