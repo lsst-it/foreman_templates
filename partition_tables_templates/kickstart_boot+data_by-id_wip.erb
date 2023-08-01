@@ -19,11 +19,13 @@ hostname -f | nc <%= foreman_server_fqdn %> 8999 || true
 ls -laR /dev/disk | nc <%= foreman_server_fqdn %> 8999 || true
 echo "###" | nc <%= foreman_server_fqdn %> 8999 || true
 
-BOOT_DEV="/dev/disk/by-id/<%= host_param('boot_disk_id') %>"
+BOOT_DEV_PATH="<%= host_param('boot_disk_dev_path') or '/dev/disk/by-id' %>"
+BOOT_DEV="${BOOT_DEV_PATH}/<%= host_param('boot_disk_id') %>"
 BOOT_VG="boot_$(hostname -s)"
 
 <% if host_param('data_disk_id') %>
-DATA_DEV="/dev/disk/by-id/<%= host_param('data_disk_id') %>"
+DATA_DEV_PATH="<%= host_param('data_disk_dev_path') or '/dev/disk/by-id' %>"
+DATA_DEV="${DATA_DEV_PATH}/<%= host_param('data_disk_id') %>"
 DATA_VG="data_$(hostname -s)"
 DATA_PATH="<%= host_param('data_path') or '/data' %>"
 ALL_DEVS="${BOOT_DEV},${DATA_DEV}"
