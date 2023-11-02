@@ -232,7 +232,6 @@ key --skip
 <% else -%>
 <%= @host.diskLayout %>
 <% end -%>
-<%= snippet('kickstart_rhsm') if rhel_compatible && os_major >= 9 -%>
 
 <% if host_param_true?('use_graphical_installer') -%>
 graphical
