@@ -4,18 +4,15 @@ name: Kickstart default encrypted
 model: Ptable
 oses:
 - AlmaLinux
-- CentOS
-- CentOS_Stream
-- Fedora
 - RedHat
 - Rocky
 -%>
 <% if host_param('driverdisk_source') -%>
 driverdisk --source=<%= host_param('driverdisk_source') %>
 <% end -%>
-<% if host_param('ignoredisk_options') %>
+<% if host_param('ignoredisk_options') -%>
 ignoredisk <%= host_param('ignoredisk_options') %>
-<% end %>
+<% end -%>
 zerombr
 clearpart --all --initlabel
-autopart --encrypted --passphrase="<%= host_param('disk_enc_passphrase') ? host_param('disk_enc_passphrase') : 'linux' %>" <%= host_param('autopart_options') %>
+autopart --encrypted --passphrase="<%= host_param('disk_enc_passphrase', 'linux') %>" <%= host_param('autopart_options') %>
