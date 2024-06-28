@@ -10,7 +10,7 @@ description: |
   family and Ubuntu operating systems are supported.
 -%>
 <%
-  passphrase = host_param('disk_enc_passphrase') || 'linux'
+  passphrase = host_param('disk_enc_passphrase', 'linux')
   tang_server_list = []
   packages_redhat = "clevis clevis-luks clevis-systemd clevis-dracut"
   packages_ubuntu = "clevis clevis-luks clevis-systemd clevis-initramfs"
@@ -24,7 +24,7 @@ description: |
   end
 -%>
 
-<% (@host.operatingsystem.family == 'Redhat' or @host.operatingsystem.name == 'Ubuntu') and unless tang_server_list.blank? %>
+<% if (@host.operatingsystem.family == 'Redhat' || @host.operatingsystem.name == 'Ubuntu') && tang_server_list.present? -%>
 
 cat > /tmp/rootdir-luks-device.sh << "EOF"
 #!/bin/sh
@@ -67,21 +67,27 @@ if [[ -n "$luksdev" ]]; then
   apt -y install clevis clevis-luks clevis-initramfs clevis-systemd
 <% end %>
 
-  <% for tang_server in tang_server_list %>
+<% for tang_server in tang_server_list -%>
   echo '<%= passphrase %>' | clevis luks bind -y -k - -d $luksdev tang '{"url": "<%= tang_server %>"}'
-  <% end %>
+  if [[ $? -ne 0 ]]; then
+    echo "---"
+    echo "There was an error during Clevis LUKS bind of '$luksdev' to Tang server '<%= tang_server %>'."
+    echo "System halted."
+    sleep infinity
+  fi
+<% end -%>
   echo '<%= passphrase %>' | cryptsetup luksRemoveKey $luksdev
   systemctl enable clevis-luks-askpass.path
   systemctl enable remote-cryptsetup.target
 
-<% if @host.operatingsystem.family == 'Redhat' %>
+<% if @host.operatingsystem.family == 'Redhat' -%>
   dracut --verbose --force --hostonly-cmdline --regenerate-all
-<% elsif @host.operatingsystem.name == 'Ubuntu' %>
+<% elsif @host.operatingsystem.name == 'Ubuntu' -%>
   update-initramfs -u -k 'all'
-<% end %>
+<% end -%>
 
 else
   echo "No LUKS device found!"
 fi
 
-<% end %>
+<% end -%>
