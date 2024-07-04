@@ -43,9 +43,9 @@ part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV} --fstype=ext4
 <% end -%>
 
 <% if host_param('disk_enc_enabled') -%>
-part pv.data --size=1 --grow --ondisk=${DOCKER_DEV} --encrypted --passphrase="<%= host_param('disk_enc_passphrase') ? host_param('disk_enc_passphrase') : 'linux' %>"
+part pv.data --size=1 --grow --ondisk=${DATA_DEV} --encrypted --passphrase="<%= host_param('disk_enc_passphrase') ? host_param('disk_enc_passphrase') : 'linux' %>"
 <% else -%>
-part pv.data --size=1 --grow --ondisk=${DOCKER_DEV}
+part pv.data --size=1 --grow --ondisk=${DATA_DEV}
 <% end -%>
 
 volgroup ${BOOT_VG} pv.boot
