@@ -30,7 +30,8 @@ DATA_PATH="<%= host_param('data_path') or '/data' %>"
 ALL_DEVS="${BOOT_DEV},${DATA_DEV}"
 
 cat <<EOF > /tmp/diskpart.cfg
-ignoredisk --only-use=${ALL_DEVS}
+# clear the parition table from *ALL* drives by default
+# ignoredisk --only-use=${ALL_DEVS}
 zerombr
 clearpart --drives=${ALL_DEVS} --all --initlabel --disklabel=gpt
 
