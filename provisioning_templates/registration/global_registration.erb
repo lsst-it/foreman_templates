@@ -10,8 +10,11 @@ description: |
   on the template of host_init_config kind.
 -%>
 #!/bin/sh
+
+# Make sure, all command output can be parsed (e.g. from subscription-manager)
+export LC_ALL=C LANG=C
 <%
-    headers = ["-H 'Authorization: Bearer #{@auth_token}'"]
+    headers = ["--header 'Authorization: Bearer #{@auth_token}'"]
     activation_keys = [(@hostgroup.params['kt_activation_keys'] if @hostgroup), @activation_keys].compact.join(',')
 -%>
 
@@ -23,22 +26,25 @@ description: |
 <%= "\n# Operating system: [#{@operatingsystem}]" if @operatingsystem -%>
 <%= "\n# Setup Insights: [#{@setup_insights}]" unless @setup_insights.nil? -%>
 <%= "\n# Setup remote execution: [#{@setup_remote_execution}]" unless @setup_remote_execution.nil? -%>
+<%= "\n# Setup remote execution pull: [#{@setup_remote_execution_pull}]" unless @setup_remote_execution_pull.nil? -%>
 <%= "\n# Remote execution interface: [#{@remote_execution_interface}]" if @remote_execution_interface.present? -%>
 <%= "\n# Packages: [#{@packages}]" if @packages.present? -%>
 <%= "\n# Update packages: [#{@update_packages}]" unless @update_packages.nil? -%>
-<%= "\n# Repository: [#{@repo}]" if @repo.present? -%>
-<%= "\n# Repository GPG key URL: [#{@repo_gpg_key_url}]" if @repo_gpg_key_url.present? -%>
+<%= "\n# Repository data: [#{@repo_data}]" if @repo_data.present? -%>
 <%= "\n# Force: [#{@force}]" unless @force.nil? -%>
 <%= "\n# Ignore subman errors: [#{@ignore_subman_errors}]" unless @ignore_subman_errors.nil? -%>
+<%= "\n# Set up container certs: [#{@setup_container_registry_certs}]" unless @setup_container_registry_certs.nil? -%>
 <%= "\n# Lifecycle environment id: [#{@lifecycle_environment_id}]" if @lifecycle_environment_id.present? -%>
 <%= "\n# Activation keys: [#{activation_keys}]" if activation_keys.present? -%>
+<%= "\n# Download utility: [#{@download_utility}]" unless @download_utility.nil? -%>
 
 
 if ! [ $(id -u) = 0 ]; then
-    echo "Please run as root"
-    exit 1
+  echo "Please run as root"
+  exit 1
 fi
 
+# Select package manager for the OS (sets the $PKG_MANAGER* variables)
 <%= snippet 'pkg_manager' %>
 
 SSL_CA_CERT=$(mktemp)
@@ -51,30 +57,55 @@ cleanup_and_exit() {
   exit $1
 }
 
-<% unless @repo.blank? -%>
+<%= snippet_if_exists('before_registration') -%>
+
+<% unless @repo_data.blank? -%>
+<% index = 0 %>
+<% @repo_data.each do |repo, repo_gpg_key_url| -%>
 echo '#'
 echo '# Adding repository'
 echo '#'
 
-if [ -f /etc/redhat-release ]; then
-  cat << EOF > /etc/yum.repos.d/foreman_registration.repo
-[foreman_register]
-name=foreman_register
-baseurl=<%= shell_escape @repo %>
+<% index += 1 %>
+if [ x$PKG_MANAGER = xdnf -o x$PKG_MANAGER = xyum -o x$PKG_MANAGER = xzypper ]; then
+  cat << EOF > /tmp/foreman_registration.repo
+[foreman_register<%= index %>]
+name=foreman_register<%= index %>
+baseurl=<%= shell_escape repo %>
 enabled=1
-gpgcheck=<%= @repo_gpg_key_url.present? ? 1 : 0 %>
-gpgkey=<%= shell_escape @repo_gpg_key_url %>
+type=rpm-md
 EOF
-
-  echo "Building yum metadata cache, this may take a few minutes"
-  $PKG_MANAGER makecache
+<% if repo_gpg_key_url.present? -%>
+  echo gpgcheck=1 >> /tmp/foreman_registration.repo
+  echo gpgkey=<%= shell_escape repo_gpg_key_url %> >> /tmp/foreman_registration.repo
+<% else -%>
+  echo gpgcheck=0 >> /tmp/foreman_registration.repo
+<% end -%>
+  if [ x$PKG_MANAGER = xdnf -o x$PKG_MANAGER = xyum ]; then
+    mv -f /tmp/foreman_registration.repo /etc/yum.repos.d/foreman_registration<%= index %>.repo
+    echo "Building yum metadata cache, this may take a few minutes"
+    $PKG_MANAGER makecache
+  else
+    REPO_OPTIONS=""
+    <% if repo_gpg_key_url.present? -%>
+    <%= generate_web_request(utility: @download_utility, url: shell_escape(repo_gpg_key_url)) %> >/tmp/repo_gpg.key
+    rpm --import /tmp/repo_gpg.key
+    rm -f /tmp/repo_gpg.key
+    REPO_OPTIONS='--gpgcheck-allow-unsigned-repo'
+    <% end -%>
+    zypper --quiet --non-interactive addrepo $REPO_OPTIONS /tmp/foreman_registration.repo
+  fi
 elif [ -f /etc/debian_version ]; then
-  cat << EOF > /etc/apt/sources.list.d/foreman_registration.list
-<%= shell_escape @repo %>
-EOF
-<% if @repo_gpg_key_url.present? -%>
-  apt-get -y install ca-certificates gpg
-  curl --silent --show-error <%= shell_escape @repo_gpg_key_url %> | apt-key add -
+  <%= save_to_file("/etc/apt/sources.list.d/foreman_registration#{index}.list", repo) %>
+<% if repo_gpg_key_url.present? -%>
+<%# "apt 1.2.35" on Ubuntu 16.04 does not support storing GPG public keys in "/etc/apt/trusted.gpg.d/" in ASCII format -%>
+  if [ "$(. /etc/os-release ; echo "$VERSION_ID")" = "16.04" ]; then
+    $PKG_MANAGER_INSTALL ca-certificates gnupg
+    <%= indent(4, skip1: true) { generate_web_request(utility: @download_utility, url: shell_escape(repo_gpg_key_url)) } %> | gpg --dearmor > /etc/apt/trusted.gpg.d/client<%= index %>.gpg
+  else
+    $PKG_MANAGER_INSTALL ca-certificates
+    <%= indent(4, skip1: true) { generate_web_request(utility: @download_utility, url: shell_escape(repo_gpg_key_url), output_file: "/etc/apt/trusted.gpg.d/client#{index}.asc") } %>
+  fi
 <% end -%>
   apt-get update
 
@@ -83,125 +114,81 @@ else
   cleanup_and_exit 1
 fi
 <% end -%>
+<% end -%>
 
 register_host() {
-  curl --silent --show-error --cacert $SSL_CA_CERT --request POST <%= @registration_url %> \
-       <%= headers.join(' ') %> \
-       --data "host[name]=$(hostname --fqdn)" \
-       --data "host[build]=false" \
-       --data "host[managed]=false" \
-<%= "       --data 'host[organization_id]=#{@organization.id}' \\\n" if @organization -%>
-<%= "       --data 'host[location_id]=#{@location.id}' \\\n" if @location -%>
-<%= "       --data 'host[hostgroup_id]=#{@hostgroup.id}' \\\n" if @hostgroup -%>
-<%= "       --data 'host[operatingsystem_id]=#{@operatingsystem.id}' \\\n" if @operatingsystem -%>
-<%= "       --data host[interfaces_attributes][0][identifier]=#{shell_escape(@remote_execution_interface)} \\\n" if @remote_execution_interface.present? -%>
-<%= "       --data 'setup_insights=#{@setup_insights}' \\\n" unless @setup_insights.nil? -%>
-<%= "       --data 'setup_remote_execution=#{@setup_remote_execution}' \\\n" unless @setup_remote_execution.nil? -%>
-<%= "       --data remote_execution_interface=#{shell_escape(@remote_execution_interface)} \\\n" if @remote_execution_interface.present? -%>
-<%= "       --data packages=#{shell_escape(@packages)} \\\n" if @packages.present? -%>
-<%= "       --data 'update_packages=#{@update_packages}' \\\n" unless @update_packages.nil? -%>
-
+<%
+  params = ["host[name]=$(hostname --fqdn)"]
+  params << "host[build]=false"
+  params << "host[managed]=false"
+  params << "host[organization_id]=#{@organization.id}" if @organization
+  params << "host[location_id]=#{@location.id}" if @location
+  params << "host[hostgroup_id]=#{@hostgroup.id}" if @hostgroup
+  params << "host[operatingsystem_id]=#{@operatingsystem.id}" if @operatingsystem
+  params << "host[interfaces_attributes][0][identifier]=#{shell_escape(@remote_execution_interface)}" if @remote_execution_interface.present?
+  params << "setup_insights=#{@setup_insights}" unless @setup_insights.nil?
+  params << "setup_remote_execution=#{@setup_remote_execution}" unless @setup_remote_execution.nil?
+  params << "remote_execution_interface=#{shell_escape(@remote_execution_interface)}" if @remote_execution_interface.present?
+  params << "packages=#{shell_escape(@packages)}" if @packages.present?
+  params << "update_packages=#{@update_packages}" unless @update_packages.nil?
+-%>
+  <%= indent(2, skip1: true) { generate_web_request(utility: @download_utility, url: @registration_url, ssl_ca_cert: "$SSL_CA_CERT", output_file: "/root/registration_host_init.sh", headers: headers, params: params) } %>
 }
 
 echo "#"
 echo "# Running registration"
 echo "#"
 
-<% if plugin_present?('katello') -%>
-if [ -f /etc/redhat-release ]; then
-    register_katello_host(){
-        UUID=$(subscription-manager identity | head -1 | awk '{print $3}')
-        curl --silent --show-error --cacert $KATELLO_SERVER_CA_CERT --request POST "<%= @registration_url %>" \
-             --data "uuid=$UUID" \
-             <%= headers.join(' ') %> \
-<%= "          --data 'host[organization_id]=#{@organization.id}' \\\n" if @organization -%>
-<%= "          --data 'host[location_id]=#{@location.id}' \\\n" if @location -%>
-<%= "          --data 'host[hostgroup_id]=#{@hostgroup.id}' \\\n" if @hostgroup -%>
-<%= "          --data 'host[lifecycle_environment_id]=#{@lifecycle_environment_id}' \\\n" if @lifecycle_environment_id.present? -%>
-<%= "          --data 'setup_insights=#{@setup_insights}' \\\n" unless @setup_insights.nil? -%>
-<%= "          --data 'setup_remote_execution=#{@setup_remote_execution}' \\\n" unless @setup_remote_execution.nil? -%>
-<%= "          --data remote_execution_interface=#{shell_escape(@remote_execution_interface)} \\\n" if @remote_execution_interface.present? -%>
-<%= "          --data packages=#{shell_escape(@packages)} \\\n" if @packages.present? -%>
-<%= "          --data 'update_packages=#{@update_packages}' \\\n" unless @update_packages.nil? -%>
+<% if plugin_present?('katello') && activation_keys.present? -%>
+register_katello_host(){
+<%
+  params = ["uuid=$UUID"]
+  params << "host[build]=false"
+  params << "host[organization_id]=#{@organization.id}" if @organization
+  params << "host[location_id]=#{@location.id}" if @location
+  params << "host[hostgroup_id]=#{@hostgroup.id}" if @hostgroup
+  params << "host[lifecycle_environment_id]=#{@lifecycle_environment_id}" if @lifecycle_environment_id.present?
+  params << "setup_insights=#{@setup_insights}" unless @setup_insights.nil?
+  params << "setup_remote_execution=#{@setup_remote_execution}" unless @setup_remote_execution.nil?
+  params << "remote_execution_interface=#{shell_escape(@remote_execution_interface)}" if @remote_execution_interface.present?
+  params << "setup_remote_execution_pull=#{@setup_remote_execution_pull}" unless @setup_remote_execution_pull.nil?
+  params << "packages=#{shell_escape(@packages)}" if @packages.present?
+  params << "update_packages=#{@update_packages}" unless @update_packages.nil?
+-%>
+  UUID=$(subscription-manager identity | grep --max-count 1 --only-matching '\([[:xdigit:]]\{8\}-[[:xdigit:]]\{4\}-[[:xdigit:]]\{4\}-[[:xdigit:]]\{4\}-[[:xdigit:]]\{12\}\)')
+  <%= indent(2, skip1: true) { generate_web_request(utility: @download_utility, url: @registration_url, ssl_ca_cert: "$KATELLO_SERVER_CA_CERT", output_file: "/root/registration_host_init.sh", headers: headers, params: params) } %>
+}
 
-    }
+# Set up subscription-manager
+<%= snippet("subscription_manager_setup", variables: { subman_setup_scenario: 'registration' }).strip -%>
 
-    KATELLO_SERVER_CA_CERT=/etc/rhsm/ca/katello-server-ca.pem
-    RHSM_CFG=/etc/rhsm/rhsm.conf
-
-    # Backup rhsm.conf
-    if [ -f $RHSM_CFG ] ; then
-      test -f $RHSM_CFG.bak || cp $RHSM_CFG $RHSM_CFG.bak
-    fi
-
-    # rhn-client-tools conflicts with subscription-manager package
-    # since rhn tools replaces subscription-manager, we need to explicitly
-    # install subscription-manager after the rhn tools cleanup
-    if [ x$ID = xol ]; then
-      $PKG_MANAGER remove -y rhn-client-tools
-      $PKG_MANAGER install -y --setopt=obsoletes=0 subscription-manager
-    fi
-
-    # Prepare SSL certificate
-    mkdir -p /etc/rhsm/ca
-    cp -f $SSL_CA_CERT $KATELLO_SERVER_CA_CERT
-    chmod 644 $KATELLO_SERVER_CA_CERT
-
-    # Prepare subscription-manager
-    <% if truthy?(@force) -%>
-    if [ -x "$(command -v subscription-manager)" ] ; then
-      subscription-manager unregister || true
-      subscription-manager clean
-    fi
-
-    $PKG_MANAGER remove -y katello-ca-consumer\*
-    <% end -%>
-
-    if ! [ -x "$(command -v subscription-manager)" ] ; then
-      $PKG_MANAGER install -y subscription-manager
-    else
-      $PKG_MANAGER upgrade -y subscription-manager
-    fi
-
-    if ! [ -f $RHSM_CFG ] ; then
-      echo "'$RHSM_CFG' not found, cannot configure subscription-manager"
-      cleanup_and_exit 1
-    fi
-
-    # Configure subscription-manager
-    test -f $RHSM_CFG.bak || cp $RHSM_CFG $RHSM_CFG.bak
-    subscription-manager config \
-      --server.hostname="<%= @rhsm_url.host if @rhsm_url %>" \
-      --server.port="<%= @rhsm_url.port if @rhsm_url %>" \
-      --server.prefix="<%= @rhsm_url.path if @rhsm_url %>" \
-      --rhsm.repo_ca_cert="$KATELLO_SERVER_CA_CERT" \
-      --rhsm.baseurl="<%= @pulp_content_url %>"
-
-    # Older versions of subscription manager may not recognize
-    # report_package_profile and package_profile_on_trans options.
-    # So set them separately and redirect out & error to /dev/null
-    # to fail silently.
-    subscription-manager config --rhsm.package_profile_on_trans=1 > /dev/null 2>&1 || true
-    subscription-manager config --rhsm.report_package_profile=1 > /dev/null 2>&1 || true
-
-    # Configuration for EL6
-    if grep --quiet full_refresh_on_yum $RHSM_CFG; then
-      sed -i "s/full_refresh_on_yum\s*=.*$/full_refresh_on_yum = 1/g" $RHSM_CFG
-    else
-      full_refresh_config="#config for on-premise management\nfull_refresh_on_yum = 1"
-      sed -i "/baseurl/a $full_refresh_config" $RHSM_CFG
-    fi
-
-    subscription-manager register <%= '--force' if truthy?(@force) %> \
-      --org='<%= @organization.label if @organization %>' \
-      --activationkey='<%= activation_keys %>' || <%= truthy?(@ignore_subman_errors) ? 'true' : 'cleanup_and_exit 1' %>
-
-    register_katello_host | bash
-else
-    register_host | bash
-fi
-<% else -%>
-register_host | bash
+subscription-manager register <%= '--force' if truthy?(@force) %> \
+  --org='<%= @organization.label if @organization %>' \
+  --activationkey='<%= activation_keys %>' || <%= truthy?(@ignore_subman_errors) ? 'true' : 'cleanup_and_exit 1' %>
 <% end -%>
+
+# Update / create the host record in Foreman and fetch the host initial configuration script
+<%= plugin_present?('katello') ? "register_katello_host" : "register_host" %>
+
+curl_status=$?
+if [ $curl_status -ne 0 ]; then
+  echo "Failed to fetch the host initialization script."
+  echo "Please see the logs for more information."
+  cleanup_and_exit $curl_status
+fi
+
+bash /root/registration_host_init.sh
+init_conf_status=$?
+
+if [ $init_conf_status -ne 0 ]; then
+  echo "Host initialization script failed, see the logs for more information."
+  echo "You can access the script source by running 'cat /root/registration_host_init.sh'"
+  cleanup_and_exit $init_conf_status
+fi
+
+<% if truthy?(@setup_container_registry_certs) -%>
+<%= snippet('container_certs_setup') -%>
+<% end -%>
+<%= snippet_if_exists('after_registration') -%>
 
 cleanup_and_exit

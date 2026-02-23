@@ -9,7 +9,6 @@ oses:
 - Fedora
 - Rocky
 description: |
-  description: |
   This template is used during image based provisioning, when the image is configured to use user-data.
   The output is a shell script that cloud-init runs to configures the VM
   booted from the image. The image must have cloud-init installed in order for this to work.
@@ -42,7 +41,7 @@ echo 'root:<%= root_pass -%>' | /usr/sbin/chpasswd -e
 
 <%= snippet 'redhat_register' %>
 
-<% if host_enc['parameters']['realm'] && @host.realm && (@host.realm.realm_type == 'FreeIPA' || @host.realm.realm_type == 'Red Hat Identity Management') -%>
+<% if @host.realm && (@host.realm.realm_type == 'FreeIPA' || @host.realm.realm_type == 'Red Hat Identity Management') -%>
 <%= snippet 'freeipa_register' %>
 <% end -%>
 
@@ -64,7 +63,7 @@ fi
 <% end -%>
 
 <% if puppet_enabled %>
-<% if host_param_true?('enable-puppetlabs-repo') || host_param_true?('enable-official-puppet7-repo') || host_param_true?('enable-puppetlabs-puppet6-repo') || host_param_true?('enable-puppetlabs-puppet5-repo') -%>
+<% if host_param_true?('enable-puppetlabs-repo') || host_param_true?('enable-official-puppet8-repo') || host_param_true?('enable-official-puppet7-repo') || host_param_true?('enable-puppetlabs-puppet6-repo') || host_param_true?('enable-puppetlabs-puppet5-repo') -%>
 <%= snippet 'puppetlabs_repo' %>
 <% end -%>
 <%= snippet 'puppet_setup' %>
