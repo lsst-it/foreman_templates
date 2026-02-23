@@ -28,6 +28,11 @@ description: |
   file.
 -%>
 
+# Select package manager for the OS (sets the $PKG_MANAGER* variables)
+if [ -z "$PKG_MANAGER" ]; then
+<%= indent(2) { snippet 'pkg_manager' } -%>
+fi
+
 <% if !host_param('remote_execution_ssh_keys').blank? %>
 <% ssh_user = host_param('remote_execution_ssh_user') || 'root' %>
 
@@ -52,17 +57,25 @@ EOF
   chmod 0700 <%= ssh_path %>
   chmod 0600 <%= ssh_path %>/authorized_keys
   chown -R <%= "#{ssh_user}:" %> <%= ssh_path %>
+<% if ssh_user != 'root' -%>
+  chown -R <%= "#{ssh_user}:" %> <%= "~#{ssh_user}" %>
+<% end -%>
 
   # Restore SELinux context with restorecon, if it's available:
   command -v restorecon && restorecon -RvF <%= ssh_path %> || true
 
 <% if ssh_user != 'root' && host_param('remote_execution_effective_user_method') == 'sudo' -%>
+if [ ! -x "$(command -v sudo)" ]; then
+  $PKG_MANAGER_INSTALL sudo
+fi
 <% if @host.operatingsystem.family == 'Redhat' || @host.operatingsystem.family == 'Debian' -%>
-echo "<%= ssh_user %> ALL = (root) NOPASSWD : ALL
-Defaults:<%= ssh_user %> !requiretty" > /etc/sudoers.d/<%= ssh_user %>
+echo "<%= ssh_user %> ALL = (ALL) NOPASSWD : ALL" > /etc/sudoers.d/<%= ssh_user %>
+echo "Defaults:<%= ssh_user %> !requiretty" >> /etc/sudoers.d/<%= ssh_user %>
+chmod 440 /etc/sudoers.d/<%= ssh_user %>
 <% elsif @host.operatingsystem.family == 'Suse' -%>
-echo "<%= ssh_user %> ALL = (root) NOPASSWD : ALL
-Defaults:<%= ssh_user %> !targetpw" >> /etc/sudoers
+echo "<%= ssh_user %> ALL = (ALL) NOPASSWD : ALL" >> /etc/sudoers
+echo "Defaults:<%= ssh_user %> !targetpw" >> /etc/sudoers
+chmod 440 /etc/sudoers.d/<%= ssh_user %>
 <% end -%>
 <% end -%>
 else

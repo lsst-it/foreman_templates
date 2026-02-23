@@ -16,6 +16,8 @@ test_on:
 - host4static
 - host6static
 - rhel9_dhcp
+- rocky8_dhcp
+- rocky9_dhcp
 description: |
   The provisioning template for kickstart based distributions. The output is fetched by Anaconda installer during
   the network based installation. To customize the installation, modify the host parameters.
@@ -33,11 +35,14 @@ description: |
   - enable-puppetlabs-puppet5-repo: boolean (default=false)
   - enable-puppetlabs-puppet6-repo: boolean (default=false)
   - enable-official-puppet7-repo: boolean (default=false)
+  - enable-official-puppet8-repo: boolean (default=false)
   - skip-puppet-setup: boolean (default=false)
   - salt_master: string (default=undef)
+  - ntp-pools: array (default=undef)
   - ntp-server: string (default=undef)
   - bootloader-append: string (default="nofb quiet splash=quiet")
   - disable-firewall: boolean (default=false)
+  - kdump-options: string (default=undef)
   - package_upgrade: boolean (default=true)
   - disable-uek: boolean (default=false)
   - use-ntp: boolean (default depends on OS release)
@@ -50,7 +55,8 @@ description: |
   Reference links:
   - https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s1-kickstart2-options
   - https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/installation_guide/sect-kickstart-syntax
-  - https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/performing_an_advanced_rhel_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user
+  - https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/automatically_installing_rhel/kickstart-commands-and-options-reference_rhel-installer
+  - https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/automatically_installing_rhel/kickstart-commands-and-options-reference_rhel-installer
 -%>
 <%
   rhel_compatible = @host.operatingsystem.family == 'Redhat' && @host.operatingsystem.name != 'Fedora'
@@ -68,6 +74,7 @@ description: |
   use_ntp = host_param_true?('use-ntp', (is_fedora && os_major < 16) || (rhel_compatible && os_major <= 6))
   iface = @host.provision_interface
   appstream_present = false
+  use_rhsm = (@host.operatingsystem.name == 'RedHat' || @host.operatingsystem.name == 'RHEL') && os_major >= 9
 -%>
 # This kickstart file was rendered from the Foreman provisioning template "<%= @template_name %>".
 # for <%= @host %> running <%= @host.operatingsystem.name %> <%= os_major %> <%= @arch %>
@@ -110,104 +117,59 @@ selinux --<%= host_param('selinux-mode') || host_param('selinux') || 'enforcing'
 keyboard <%= host_param('keyboard') || 'us' %>
 
 <%
-  network_options = []
-  nameservers = []
-  subnet4 = iface.subnet
-  subnet6 = iface.subnet6
-
-  # device and hostname
-  if iface.bond? && rhel_compatible && os_major >= 6
-    network_options.push("--device=#{iface.identifier}")
-  else
-    network_options.push("--device=#{iface.mac || iface.identifier}")
-  end
-  network_options.push("--hostname #{@host.name}")
-
-  # single stack
-  if subnet4 && !subnet6
-    network_options.push("--noipv6")
-  elsif !subnet4 && subnet6
-    network_options.push("--noipv4")
-  end
-
-  # dual stack MTU check
-  raise("IPv4 and IPv6 subnets have different MTU") if subnet4 && subnet6 && subnet4.mtu.present? && subnet6.mtu.present? && subnet4.mtu != subnet6.mtu
-
-  # IPv4
-  if (subnet4 && !subnet4.dhcp_boot_mode?) || @static
-    network_options.push("--bootproto static")
-    network_options.push("--ip=#{iface.ip}")
-    network_options.push("--netmask=#{subnet4.mask}")
-    network_options.push("--gateway=#{subnet4.gateway}")
-  elsif subnet4 && subnet4.dhcp_boot_mode?
-    network_options.push("--bootproto dhcp")
-  end
-  if subnet4
-    nameservers.concat(subnet4.dns_servers)
-    network_options.push("--mtu=#{subnet4.mtu}") if subnet4.mtu.present?
-  end
-
-  # IPv6
-  if rhel_compatible && os_major >= 6
-    if (subnet6 && !subnet6.dhcp_boot_mode?) || @static6
-      network_options.push("--ipv6=#{iface.ip6}/#{subnet6.cidr}")
-      network_options.push("--ipv6gateway=#{subnet6.gateway}")
-    elsif subnet6 && subnet6.dhcp_boot_mode?
-      if host_param_true?('use-slaac')
-        network_options.push("--ipv6 auto")
-      else
-        network_options.push("--ipv6 dhcp")
-      end
-    end
-    if subnet6
-      nameservers.concat(subnet6.dns_servers)
-      network_options.push("--mtu=#{subnet6.mtu}") if subnet6.mtu.present?
-    end
-  end
-
-  # bond
-  if iface.bond? && rhel_compatible && os_major >= 6
-    bond_slaves = iface.attached_devices_identifiers.join(',')
-    network_options.push("--bondslaves=#{bond_slaves}")
-    network_options.push("--bondopts=mode=#{iface.mode},#{iface.bond_options.tr(' ', ',')}")
-  end
-
-  # VLAN (only on physical is recognized)
-  if iface.virtual? && iface.tag.present? && iface.attached_to.present?
-    if rhel_compatible && os_major == 6
-      network_options.push("--vlanid=#{iface.tag}")
-    else
-      network_options.push("--interfacename=vlan#{iface.tag}")
-    end
-  end
-
-  # DNS
-  if nameservers.size > 0
-    network_options.push("--nameserver=#{nameservers.join(',')}")
-  else
-    network_options.push("--nodns")
-  end
+# start with provisioning interface, then other non-bond non-bridge interfaces and the bonds + bridges at the end
+@host.interfaces.reject{ |iface| iface.bmc? }.sort_by { |iface| (iface.bond? || iface.bridge?) ? 0 : iface.provision? ? 20 : 10 }.each do |iface|
 -%>
-network <%= network_options.join(' ') %>
+<%= snippet(
+      'kickstart_network_interface',
+      variables: {
+        iface: iface,
+        host: @host,
+        static: @static,
+        static6: @static6
+      }
+    ) -%>
+<%
+end
+-%>
 
 rootpw --iscrypted <%= root_pass %>
+<%# Firewall -%>
 <% if host_param_true?('disable-firewall') -%>
 firewall --disable
 <% else -%>
 firewall --<%= os_major >= 6 ? 'service=' : '' %>ssh
 <% end -%>
+<%# Kdump -%>
+<% if host_param('kdump-options').present? -%>
+%addon com_redhat_kdump <%= host_param('kdump-options') %>
+%end
+<% end -%>
+<%# Authentication options -%>
 <% if (is_fedora && os_major >= 28) || (rhel_compatible && os_major > 7) -%>
 authselect --useshadow --passalgo=<%= @host.operatingsystem.password_hash.downcase || 'sha256' %> --kickstart
 <% else -%>
 authconfig --useshadow --passalgo=<%= @host.operatingsystem.password_hash.downcase || 'sha256' %> --kickstart
 <% end -%>
+<%# Timezone + NTP -%>
+<% if rhel_compatible && os_major < 9 -%>
 timezone --utc <%= host_param('time-zone') || 'UTC' %> <%= host_param('ntp-server') ? "--ntpservers #{host_param('ntp-server')}" : '' %>
+<% else -%>
+timezone --utc <%= host_param('time-zone') || 'UTC' %>
+<% if host_param('ntp-pools') -%>
+<% host_param('ntp-pools').each do |ntppool| -%>
+timesource --ntp-pool <%= ntppool %>
+<% end -%>
+<% elsif host_param('ntp-server') -%>
+timesource --ntp-server <%= host_param('ntp-server') %>
+<% end -%>
+<% end -%>
 
 <% if rhel_compatible -%>
 services --disabled gpm,sendmail,cups,pcmcia,isdn,rawdevices,hpoj,bluetooth,openibd,avahi-daemon,avahi-dnsconfd,hidd,hplip,pcscd
 <% end -%>
 
-<% if realm_compatible && host_enc['parameters']['realm'] && @host.realm && @host.realm.realm_type == 'Active Directory' -%>
+<% if realm_compatible && @host.realm && @host.realm.realm_type == 'Active Directory' -%>
 # One-time password will be requested at install time. Otherwise, $HOST[OTP] is used as a placeholder value.
 realm join --one-time-password='<%= @host.otp || "$HOST[OTP]" %>' <%= @host.realm %>
 <% end -%>
@@ -232,6 +194,7 @@ key --skip
 <% else -%>
 <%= @host.diskLayout %>
 <% end -%>
+<%= snippet('kickstart_rhsm') if use_rhsm -%>
 
 <% if host_param_true?('use_graphical_installer') -%>
 graphical
@@ -295,8 +258,6 @@ exec < /dev/tty3 > /dev/tty3
 chvt 3
 (
 logger "Starting anaconda <%= @host %> postinstall"
-<%= snippet 'kickstart_networking_setup' %>
-
 <%= snippet 'ntp' %>
 
 <%= snippet 'yum_proxy' %>
@@ -305,9 +266,9 @@ logger "Starting anaconda <%= @host %> postinstall"
 <%= snippet 'epel' -%>
 <% end -%>
 
-<%= snippet 'redhat_register' if rhel_compatible && os_major < 9 -%>
+<%= snippet 'redhat_register' if rhel_compatible && !use_rhsm -%>
 
-<% if host_enc['parameters']['realm'] && @host.realm && (@host.realm.realm_type == 'FreeIPA' || @host.realm.realm_type == 'Red Hat Identity Management') -%>
+<% if @host.realm && (@host.realm.realm_type == 'FreeIPA' || @host.realm.realm_type == 'Red Hat Identity Management') -%>
 <%= snippet 'freeipa_register' %>
 <% end -%>
 
@@ -335,7 +296,7 @@ chmod +x /root/remote_execution_pull_setup.sh
 <% end -%>
 
 <% if puppet_enabled %>
-<% if host_param_true?('enable-puppetlabs-repo') || host_param_true?('enable-official-puppet7-repo') || host_param_true?('enable-puppetlabs-puppet6-repo')|| host_param_true?('enable-puppetlabs-puppet5-repo') -%>
+<% if host_param_true?('enable-puppetlabs-repo') || host_param_true?('enable-official-puppet8-repo') || host_param_true?('enable-official-puppet7-repo') || host_param_true?('enable-puppetlabs-puppet6-repo')|| host_param_true?('enable-puppetlabs-puppet5-repo') -%>
 <%= snippet 'puppetlabs_repo' %>
 <% end -%>
 <%= snippet 'puppet_setup' %>
@@ -358,12 +319,15 @@ sed -e 's/DEFAULTKERNEL=kernel-uek/DEFAULTKERNEL=kernel/g' -i /etc/sysconfig/ker
 <%= snippet_if_exists(template_name + " custom post") %>
 
 <%= snippet 'insights' if host_param_true?('host_registration_insights') && os_major < 9 -%>
-
-<%= snippet 'disk_enc_clevis_tang' %>
+<%= snippet 'disk_enc_clevis_tang' if host_param('disk_enc_tang_servers') -%>
 
 touch /tmp/foreman_built
 
+<% if host_param_true?('use_graphical_installer') -%>
+chvt 6
+<% else -%>
 chvt 1
+<% end -%>
 ) 2>&1 | tee /root/install.post.log
 <%= section_end %>
 
@@ -385,10 +349,10 @@ The last post section halts Anaconda to prevent endless loop in case HTTP reques
 
 if test -f /tmp/foreman_built; then
   echo "calling home: build is done!"
-  <%= indent(2, skip1: true) { snippet('built', :variables => { :endpoint => 'built', :method => 'POST', :body_file => '/root/install.post.log' }) } -%>
+  <%= indent(2, skip1: true, skip_content: 'EOF') { snippet('built', :variables => { :endpoint => 'built', :method => 'POST', :body_file => '/root/install.post.log' }) } -%>
 else
   echo "calling home: build failed!"
-  <%= indent(2, skip1: true) { snippet('built', :variables => { :endpoint => 'failed', :method => 'POST', :body_file => '/root/install.post.log' }) } -%>
+  <%= indent(2, skip1: true, skip_content: 'EOF') { snippet('built', :variables => { :endpoint => 'failed', :method => 'POST', :body_file => '/root/install.post.log' }) } -%>
 fi
 
 sync

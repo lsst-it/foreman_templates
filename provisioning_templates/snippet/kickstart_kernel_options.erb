@@ -7,6 +7,7 @@ description: |
   The list of kernel options for initrd appended to the bootloader kernel line on Red Hat compatible distributions.
   Typically renders to a string with the url where to fetch the OS installer answer files, e.g.
     network ksdevice=bootif ks.device=bootif BOOTIF=01-52-54-00-8b-a3-86 inst.ks=http://foreman.example.com/unattended/provision inst.ks.sendmac ip=dhcp nameserver=192.168.122.1
+  Custom options can be added by setting the array parameter kickstart_kernel_custom_options
 -%>
 <%
   rhel_compatible = @host.operatingsystem.family == 'Redhat' && @host.operatingsystem.name != 'Fedora'
@@ -19,6 +20,9 @@ description: |
   mac = @host.provision_interface.mac
   subnet4 = iface.subnet
   subnet6 = iface.subnet6
+  dual_stack_fallback = host_param('dual_stack_provision_fallback')
+
+  custom_options = [host_param('kickstart_kernel_custom_options')].flatten.compact
   options = []
 
   if rhel_compatible && os_major < 8
@@ -33,17 +37,37 @@ description: |
 
   # tell Anaconda what to pass off to kickstart server
   # both current and legacy syntax provided
-  if (is_fedora && os_major >= 33) || (rhel_compatible && os_major >= 9)
-    options.push("inst.ks=#{foreman_url('provision')}", "inst.ks.sendmac")
+  if (is_fedora && os_major >= 33) || (rhel_compatible && os_major >= 8)
+    if subnet4 && !subnet4.dhcp_boot_mode?
+      options.push("inst.ks=#{foreman_url('provision', static: '1').gsub("&", "\\\\&")}")
+    elsif subnet6 && !subnet6.dhcp_boot_mode?
+      options.push("inst.ks=#{foreman_url('provision', static6: '1').gsub("&", "\\\\&")}")
+    else
+      options.push("inst.ks=#{foreman_url('provision').gsub("&", "\\\\&")}", "inst.ks.sendmac")
+    end
   else
-    options.push("ks=#{foreman_url('provision')}", "kssendmac", "ks.sendmac")
+    if subnet4 && !subnet4.dhcp_boot_mode?
+      options.push("ks=#{foreman_url('provision', static: '1').gsub("&", "\\\\&")}")
+    elsif subnet6 && !subnet6.dhcp_boot_mode?
+      options.push("ks=#{foreman_url('provision', static6: '1').gsub("&", "\\\\&")}")
+    else
+      options.push("ks=#{foreman_url('provision').gsub("&", "\\\\&")}", "kssendmac", "ks.sendmac")
+    end
   end
 
   # networking credentials
-  raise("Dual-stack provisioning not supported") if subnet4 && subnet6
+  if subnet4 && subnet6
+    if dual_stack_fallback == 'IPv4'
+      subnet6 = false
+    elsif dual_stack_fallback == 'IPv6'
+      subnet4 = false
+    else
+      raise("Dual-stack provisioning not supported, set parameter 'dual_stack_provision_fallback'")
+    end
+  end
   options.push("dualstack!") if subnet4 && subnet6
   if subnet4 && subnet4.dhcp_boot_mode?
-    options.push("ip=dhcp") if rhel_compatible && major >= 7
+    options.push("ip=::::#{hostname}::dhcp") if rhel_compatible && major >= 7
   elsif subnet4 && !subnet4.dhcp_boot_mode?
     if rhel_compatible && major < 7
       dns_servers = subnet4.dns_servers.join(',')
@@ -60,11 +84,7 @@ description: |
       end
     end
   elsif subnet6 && subnet6.dhcp_boot_mode? && rhel_compatible && major >= 7
-    if host_param_true?("use-slaac")
-      options.push("ip=auto6")
-    else
-      options.push("ip=dhcp6")
-    end
+    options.push("ip=::::#{hostname}::auto6")
   elsif subnet6 && !subnet6.dhcp_boot_mode?
     raise("Static IPv6 provisioning works on RHEL7 or newer") if rhel_compatible && major < 7
     gw = subnet6.gateway ? "[#{subnet6.gateway}]" : ""
@@ -102,16 +122,11 @@ description: |
     if (is_fedora && os_major < 17) || (rhel_compatible && os_major < 7)
       options.push("vlanid=#{iface.tag}")
     else
-      options.push("vlan=vlan#{iface.tag}:#{iface.attached_to}")
+      options.push("vlan=#{iface.attached_to}.#{iface.tag}:#{iface.attached_to}")
     end
   end
 
-  # optional repository for Atomic
-  if @host.operatingsystem.name.match(/Atomic/i)
-    options.push("inst.repo=#{medium_uri}")
-  end
-
-  if @host.operatingsystem.name.match(/Atomic/i) || host_param('kickstart_liveimg')
+  if host_param('kickstart_liveimg')
     options.push("inst.stage2=#{medium_uri}")
   end
 
@@ -127,8 +142,7 @@ description: |
     options.push('fips=1')
   end
 
-  nic_delay = subnet4 ? subnet4.nic_delay : nil
-  nic_delay ||= subnet6 ? subnet6.nic_delay : nil
+  nic_delay = subnet4&.nic_delay || subnet6&.nic_delay
   if nic_delay && rhel_compatible && major >= 7
     ["dhcp", "iflink", "ifup", "route", "ipv6dad", "ipv6auto", "carrier"].each do |type|
       options.push("rd.net.timeout.#{type}=#{nic_delay}")
@@ -136,6 +150,9 @@ description: |
   elsif nic_delay
     options.push("nicdelay=#{nic_delay} linksleep=#{nic_delay}")
   end
+
+  # add user specified custom options if specified (noop if not)
+  options.concat(custom_options)
 -%>
 <%# do not add newline after the next line %>
 <%= options.join(' ') -%>

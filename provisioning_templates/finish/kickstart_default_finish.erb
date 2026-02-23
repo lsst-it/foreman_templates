@@ -22,6 +22,7 @@ description: |
   - ntp-server: string (default=undef)
   - package_upgrade: boolean (default=true)
   - salt_master: string (default=undef)
+  - enable-remote-execution-pull: boolean (default=false)
 -%>
 <%
   rhel_compatible = @host.operatingsystem.family == 'Redhat' && @host.operatingsystem.name != 'Fedora'
@@ -32,14 +33,6 @@ description: |
 %>
 
 <%= snippet_if_exists(template_name + " custom pre") -%>
-<% if @host.subnet.respond_to?(:dhcp_boot_mode?) -%>
-<%= snippet 'kickstart_networking_setup' %>
-<% if (rhel_compatible && os_major >= 8) -%>
-systemctl restart NetworkManager
-<% else -%>
-service network restart
-<% end -%>
-<% end -%>
 
 <% if @host.provision_method == 'image' && root_pass.present? -%>
 # Install the root password
@@ -56,7 +49,7 @@ echo 'root:<%= root_pass -%>' | /usr/sbin/chpasswd -e
 
 <%= snippet 'redhat_register' %>
 
-<% if host_enc['parameters']['realm'] && @host.realm && (@host.realm.realm_type == 'FreeIPA' || @host.realm.realm_type == 'Red Hat Identity Management') -%>
+<% if @host.realm && (@host.realm.realm_type == 'FreeIPA' || @host.realm.realm_type == 'Red Hat Identity Management') -%>
 <%= snippet 'freeipa_register' %>
 <% end -%>
 
@@ -71,6 +64,12 @@ fi
 
 <%= snippet('remote_execution_ssh_keys') %>
 
+<% if plugin_present?('katello') && host_param_true?('enable-remote-execution-pull') -%>
+<%= save_to_file('/root/remote_execution_pull_setup.sh', snippet('remote_execution_pull_setup'), verbatim: true) %>
+chmod +x /root/remote_execution_pull_setup.sh
+/root/remote_execution_pull_setup.sh
+<% end -%>
+
 <%= snippet "blacklist_kernel_modules" %>
 
 <%= snippet_if_exists(template_name + " custom post") -%>
@@ -79,7 +78,7 @@ fi
 <% end -%>
 
 <% if puppet_enabled %>
-<% if host_param_true?('enable-puppetlabs-repo') || host_param_true?('enable-official-puppet7-repo') || host_param_true?('enable-puppetlabs-puppet6-repo') || host_param_true?('enable-puppetlabs-puppet5-repo') -%>
+<% if host_param_true?('enable-puppetlabs-repo') || host_param_true?('enable-official-puppet8-repo') || host_param_true?('enable-official-puppet7-repo') || host_param_true?('enable-puppetlabs-puppet6-repo') || host_param_true?('enable-puppetlabs-puppet5-repo') -%>
 <%= snippet 'puppetlabs_repo' %>
 <% end -%>
 <%= snippet 'puppet_setup' %>
