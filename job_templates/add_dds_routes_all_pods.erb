@@ -1,0 +1,53 @@
+<%#
+name: add_dds_routes_all_pods
+snippet: false
+model: JobTemplate
+job_category: Miscellaneous
+provider_type: SSH
+kind: job_template
+%>
+
+#!/usr/bin/env bash
+
+set -e
+
+subnet=(
+  "139.229.147.0/24 via 139.229.170.254 dev net1"
+  "139.229.166.0/24 via 139.229.170.254 dev net1"
+  "139.229.167.0/24 via 139.229.170.254 dev net1"
+  "139.229.178.0/24 via 139.229.170.254 dev net1"
+)
+
+ip_cmd() {
+  nsenter -t ${ns_pid} -n ip "$@"
+}
+
+#
+# find every container with a net1 interfaces
+#
+
+# find all docker container ids
+read -r -a all_docker_ids <<< $(docker ps --format '{{.ID}}')
+
+# find the ns pid of all containers that have a net1 interface
+declare -a multus_pids
+for id in ${all_docker_ids[@]}; do
+  ns_pid=$(docker inspect --format '{{.State.Pid}}' ${id})
+  if ip_cmd a show dev net1 > /dev/null 2>&1; then
+    multus_pids+=($ns_pid)
+  fi
+done
+
+# check each multus container for routes
+for id in ${multus_pids[@]}; do
+  ns_pid=$id
+  for s in "${subnet[@]}"; do
+   if ! ip_cmd route | grep "${s}" > /dev/null 2>&1; then
+      ip_cmd route add ${s}
+   fi
+  done
+
+  # print all routes to screen
+  echo "### netns=${ns_pid}"
+  ip_cmd route
+done

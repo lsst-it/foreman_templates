@@ -1,0 +1,25 @@
+<%#
+name: jhoblitt-test1
+snippet: false
+model: Ptable
+os_family: Redhat
+organizations:
+- LSST
+locations:
+- BDC
+-%>
+# all params
+<% host_enc['parameters'].sort.each do |k,v| -%>
+<%= k -%> : <%= v -%>,
+<% end -%>
+
+# disk_X_id params
+<% all_devs = [] -%>
+<% host_enc['parameters'].sort.each do |k,v| -%>
+<% next unless k.match(/^disk_(.+)_id$/) -%>
+<% dev = k.gsub(/^disk_/, '').gsub(/_id$/, '') -%>
+<% dev_var = "#{dev.upcase}_DEV" -%>
+<% all_devs.push(dev_var) -%>
+<%= "#{dev_var}=/dev/disk/by-id/#{v}" %>
+<% end -%>
+ALL_DEVS="<%= all_devs.collect {|x| "${#{x}}"}.join(',') %>"

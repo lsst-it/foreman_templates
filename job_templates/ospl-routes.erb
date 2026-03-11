@@ -1,0 +1,30 @@
+<%#
+name: ospl-routes
+description: add dds subnet static routes to ospl daemon pods
+snippet: false
+model: JobTemplate
+job_category: Miscellaneous
+provider_type: SSH
+kind: job_template
+%>
+
+subnet=(
+  "add 139.229.147.0/24 via 139.229.170.254 dev net1"
+  "add 139.229.166.0/24 via 139.229.170.254 dev net1"
+  "add 139.229.167.0/24 via 139.229.170.254 dev net1"
+  "add 139.229.178.0/24 via 139.229.170.254 dev net1"
+)
+
+ospl_docker_id=$(docker ps --filter name=k8s_ospl-daemon_ospl-daemon --format '{{.ID}}')
+ns_pid=$(docker inspect --format '{{.State.Pid}}' ${ospl_docker_id})
+route_cmd() {
+  sudo nsenter -t ${ns_pid} -n ip route "$@"
+}
+
+route_cmd
+
+for s in "${subnet[@]}"; do
+  route_cmd ${s}
+done
+
+route_cmd

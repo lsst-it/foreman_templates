@@ -1,0 +1,13 @@
+<%#
+name: brutal power off - carefull
+snippet: false
+model: JobTemplate
+job_category: Miscellaneous
+provider_type: script
+kind: job_template
+%>
+
+set -x
+sync
+sync
+ipmitool chassis power off

@@ -1,0 +1,11 @@
+<%#
+name: os update no-reboot
+snippet: false
+model: JobTemplate
+job_category: Miscellaneous
+provider_type: SSH
+kind: job_template
+%>
+
+set -x
+yum update -y

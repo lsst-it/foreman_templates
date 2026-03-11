@@ -1,0 +1,48 @@
+<%#
+name: kickstart ceph
+snippet: false
+model: Ptable
+os_family: Redhat
+-%>
+
+#Dynamic
+
+# run `nc -k -l 8999` on foreman host to capture disk information
+echo "###" | nc <%= foreman_server_fqdn %> 8999 || true
+hostname -f | nc <%= foreman_server_fqdn %> 8999 || true
+ls -laR /dev/disk | nc <%= foreman_server_fqdn %> 8999 || true
+echo "###" | nc <%= foreman_server_fqdn %> 8999 || true
+
+BOOT_DEV="/dev/disk/by-id/<%= host_param('boot_disk_id') %>"
+BOOT_VG="boot_$(hostname -s)"
+
+DOCKER_DEV="/dev/disk/by-id/<%= host_param('docker_disk_id') %>"
+DOCKER_VG="docker_$(hostname -s)"
+
+cat <<EOF > /tmp/diskpart.cfg
+ignoredisk --only-use=${BOOT_DEV},${DOCKER_DEV}
+zerombr
+clearpart --drives=${BOOT_DEV},${DOCKER_DEV} --all --initlabel --disklabel=gpt
+
+part /boot     --size=1024 --asprimary --ondrive=${BOOT_DEV} --fstype=ext4
+part /boot/efi --size=200  --asprimary --ondrive=${BOOT_DEV} --fstype=efi
+<% if host_param('disk_enc_enabled') -%>
+part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV} --fstype=ext4 --encrypted --passphrase="<%= host_param('disk_enc_passphrase') ? host_param('disk_enc_passphrase') : 'linux' %>"
+<% else -%>
+part pv.boot   --size=1 --grow --ondisk=${BOOT_DEV} --fstype=ext4
+<% end -%>
+
+<% if host_param('disk_enc_enabled') -%>
+part pv.docker --size=1 --grow --ondisk=${DOCKER_DEV} --encrypted --passphrase="<%= host_param('disk_enc_passphrase') ? host_param('disk_enc_passphrase') : 'linux' %>"
+<% else -%>
+part pv.docker --size=1 --grow --ondisk=${DOCKER_DEV}
+<% end -%>
+
+volgroup ${BOOT_VG} pv.boot
+volgroup ${DOCKER_VG} pv.docker
+
+logvol /                --vgname=${BOOT_VG} --size=51200 --name=root
+logvol /var/lib/rook    --vgname=${BOOT_VG} --size=51200 --name=rook
+logvol /var/lib/kubelet --vgname=${DOCKER_VG} --size=262144 --name=kubelet
+logvol /var/lib/docker  --vgname=${DOCKER_VG} --size=1 --grow --name=docker
+EOF

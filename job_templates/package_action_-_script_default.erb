@@ -1,0 +1,190 @@
+<%#
+name: Package Action - Script Default
+snippet: false
+template_inputs:
+- name: pre_script
+  required: false
+  input_type: user
+  description: A script to run prior to the package action
+  advanced: true
+  value_type: plain
+  hidden_value: false
+- name: action
+  required: true
+  input_type: user
+  description: 'The package action: install, update, or remove'
+  options: |-
+    install
+    update
+    remove
+    group install
+    group remove
+  advanced: false
+  value_type: plain
+  hidden_value: false
+- name: package
+  required: false
+  input_type: user
+  description: The name of the package, if any
+  advanced: false
+  value_type: plain
+  hidden_value: false
+- name: post_script
+  required: false
+  input_type: user
+  description: A script to run after the package action
+  advanced: true
+  value_type: plain
+  hidden_value: false
+- name: refresh_subscription
+  required: false
+  input_type: user
+  description: Refresh subscription-manager state. Default is "false".
+  options: "false\r\ntrue"
+  advanced: true
+  value_type: plain
+  hidden_value: false
+- name: options
+  required: false
+  input_type: user
+  description: Additional options for the package manager
+  advanced: true
+  value_type: plain
+  hidden_value: false
+model: JobTemplate
+job_category: Packages
+description_format: "%{action} package(s) %{package}"
+provider_type: script
+kind: job_template
+organizations:
+- LSST
+locations:
+- BDC
+%>
+
+<%
+  supported_families = ['Redhat', 'Debian', 'Suse']
+  render_error(N_('Unsupported or no operating system found for this host.')) unless @host.operatingsystem && supported_families.include?(@host.operatingsystem.family)
+  action = input("action")
+
+  if @host.operatingsystem.family == 'Redhat'
+    package_manager = 'yum'
+  elsif @host.operatingsystem.family == 'Debian'
+    package_manager = 'apt'
+  elsif @host.operatingsystem.family == 'Suse'
+    package_manager = 'zypper'
+  end
+-%>
+#!/bin/bash
+
+# Helper function that exits with a particular message and code.
+#
+# Usage:
+#   exit_with_message "Could not do a thing" 2
+#
+exit_with_message () {
+  echo "${1}, exiting..."
+  exit $2
+}
+
+<% if package_manager == 'zypper' -%>
+handle_zypp_res_codes () {
+  RETVAL=$1
+  ACTION=$2
+
+  # See https://github.com/openSUSE/zypper/blob/master/src/main.h
+  declare -A ZYPP_RES_CODES
+  ZYPP_RES_CODES[100]='Updates are needed'
+  ZYPP_RES_CODES[101]='Security updates are needed'
+  ZYPP_RES_CODES[102]='Reboot needed after install/upgrade'
+  ZYPP_RES_CODES[103]='Restart of package manager itself needed'
+  ZYPP_RES_CODES[104]='given capability not found'
+  ZYPP_RES_CODES[105]='SIGINT or SIGTERM received'
+  ZYPP_RES_CODES[106]='Some repos have been skipped due to refresh errors'
+  ZYPP_RES_CODES[107]='Some rpm %post configuration script failed'
+
+  if [ "${ZYPP_RES_CODES[$RETVAL]}" != "" ]; then
+    echo ${ZYPP_RES_CODES[$RETVAL]}
+  fi
+  if [[ $RETVAL -ge 100 && $RETVAL -le 103 ]]; then
+    RETVAL=0
+  elif [ "$ACTION" = "remove" ] && [ "$RETVAL" -eq 104 ]; then
+    RETVAL=0
+  fi
+
+  return $RETVAL
+}
+<% end -%>
+
+<% unless input("pre_script").blank? -%>
+  # Pre Script
+  <%= input("pre_script") %>
+  RETVAL=$?
+  [ $RETVAL -eq 0 ] || exit_with_message "Pre script failed" $RETVAL
+<% end -%>
+
+<% if input("refresh_subscription") == "true" -%>
+  [ -x "$(command -v subscription-manager)" ] && subscription-manager refresh
+<% end -%>
+
+# Action
+<% if package_manager == 'yum' -%>
+  <% if @host.respond_to?(:yum_or_yum_transient) -%>
+    <%= @host.yum_or_yum_transient %> -y <%= input("options") %> <%= action %> <%= input("package") %>
+  <% else -%>
+    yum -y <%= input("options") %> <%= action %> <%= input("package") %>
+  <% end -%>
+<% elsif package_manager == 'apt' -%>
+  <%-
+    action = 'install' if action == 'group install'
+    action = 'remove' if action == 'group remove'
+    if action == 'group update' || action == 'update'
+      if input('package').blank?
+        action = 'upgrade'
+      else
+        action = '--only-upgrade install'
+      end
+    end
+  -%>
+  run_cmd()
+  {
+    LANG=C apt-get -o APT::Get::Upgrade-Allow-New="true" -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y <%= input("options") %> <%= action %> <%= input("package") %> 2>&1
+  }
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get -y update
+  if [ "<%= action %>" = "remove" ]; then
+    OUTFILE=$(mktemp)
+    trap "rm -f $OUTFILE" EXIT
+    run_cmd > $OUTFILE
+    RETVAL=$?
+    cat $OUTFILE
+    if grep -q "Unable to locate" $OUTFILE; then
+      RETVAL=0
+    fi
+  else
+    run_cmd
+    RETVAL=$?
+  fi
+  setReturnValue() { RETVAL=$1; return $RETVAL; }
+  setReturnValue $RETVAL
+<% elsif package_manager == 'zypper' -%>
+  <%-
+    if action == "group install"
+      action = "install -t pattern"
+    elsif action == "group remove"
+      action = "remove -t pattern"
+    end
+  -%>
+  zypper refresh
+  zypper -n --gpg-auto-import-keys <%= action %> <%= input("options") %> <%= input("package") %>
+  handle_zypp_res_codes $? "<%= action %>"
+<% end -%>
+RETVAL=$?
+[ $RETVAL -eq 0 ] || exit_with_message "Package action failed" $RETVAL
+
+<% unless input("post_script").blank? -%>
+  # Post Script
+  <%= input("post_script") %>
+  RETVAL=$?
+  [ $RETVAL -eq 0 ] || exit_with_message "Post script failed" $RETVAL
+<% end -%>

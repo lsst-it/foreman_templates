@@ -1,0 +1,36 @@
+<%#
+name: Host - Vulnerabilities
+snippet: false
+template_inputs:
+- name: Without Errata Only
+  required: true
+  input_type: user
+  description: Show only CVEs without errata for host
+  options: "yes\r\nno"
+  advanced: false
+  value_type: plain
+  default: 'yes'
+  hidden_value: false
+- name: Hosts filter
+  required: false
+  input_type: user
+  description: Limit the report only on hosts found by this search query. Keep empty
+    for report on all available hosts.
+  advanced: false
+  value_type: search
+  resource_type: Host
+  hidden_value: false
+model: ReportTemplate
+-%>
+<%- report_headers 'Host Name', 'Ref Id', 'Ref URL' -%>
+<%- load_hosts(includes: [:cves], search: input('Hosts filter')).each_record do |host| -%>
+<%- scope = input('Without Errata Only') == 'yes' ? host.cves_without_errata : host.cves -%>
+<%-   scope.each do |cve| -%>
+<%-     report_row(
+          'Host Name': host.name,
+          'Ref Id': cve.ref_id,
+          'Ref URL': cve.ref_url
+        ) -%>
+<%-   end -%>
+<%- end -%>
+<%= report_render -%>

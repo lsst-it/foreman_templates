@@ -1,0 +1,23 @@
+<%#
+name: Download and run a script
+snippet: false
+template_inputs:
+- name: url
+  required: true
+  input_type: user
+  description: URL of the script to download and execute
+  advanced: false
+  value_type: plain
+  hidden_value: false
+model: JobTemplate
+job_category: Commands
+description_format: Download the script from %{url} and run it locally
+provider_type: script
+kind: job_template
+organizations:
+- LSST
+locations:
+- BDC
+%>
+
+set -o pipefail && curl -sS '<%= input("url") %>' | bash

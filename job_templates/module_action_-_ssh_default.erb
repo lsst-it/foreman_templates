@@ -1,0 +1,90 @@
+<%#
+name: Module Action - SSH Default
+snippet: false
+template_inputs:
+- name: pre_script
+  required: false
+  input_type: user
+  description: A script to run prior to the module action
+  advanced: true
+  value_type: plain
+  hidden_value: false
+- name: action
+  required: true
+  input_type: user
+  description: The module action enable, install etc.
+  options: |-
+    list
+    info
+    enable
+    disable
+    install
+    update
+    remove
+    provides
+    reset
+  advanced: false
+  value_type: plain
+  hidden_value: false
+- name: module_spec
+  required: false
+  input_type: user
+  description: The module specification. module:stream/profile
+  advanced: false
+  value_type: plain
+  hidden_value: false
+- name: options
+  required: false
+  input_type: user
+  description: Other optional flags for the action
+  advanced: false
+  value_type: plain
+  hidden_value: false
+- name: post_script
+  required: false
+  input_type: user
+  description: A script to run after the module action
+  advanced: true
+  value_type: plain
+  hidden_value: false
+model: JobTemplate
+job_category: Modules
+description_format: Module %{action} %{module_spec}
+provider_type: SSH
+kind: job_template
+%>
+
+<%
+  supported_families = ['Redhat']
+  render_error(N_('Unsupported or no operating system found for this host.')) unless @host.operatingsystem && supported_families.include?(@host.operatingsystem.family)
+-%>
+#!/bin/bash
+
+# Helper function that exits with a particular message and code.
+#
+# Usage:
+#   exit_with_message "Could not do a thing" 2
+#
+function exit_with_message {
+  echo "${1}, exiting..."
+  exit $2
+}
+
+<% unless input("pre_script").blank? -%>
+  # Pre Script
+  <%= input("pre_script") %>
+  RETVAL=$?
+  [ $RETVAL -eq 0 ] || exit_with_message "Pre script failed" $RETVAL
+<% end -%>
+
+# Action
+dnf -y module <%= input("action") %> <%= input("module_spec") %> <%= input("options") %>
+RETVAL=$?
+[ $RETVAL -eq 0 ] || exit_with_message " module action failed" $RETVAL
+
+<% unless input("post_script").blank? -%>
+  # Post Script
+  <%= input("post_script") %>
+  RETVAL=$?
+  [ $RETVAL -eq 0 ] || exit_with_message "Post script failed" $RETVAL
+<% end -%>

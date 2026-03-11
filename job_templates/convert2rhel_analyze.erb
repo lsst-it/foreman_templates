@@ -1,0 +1,53 @@
+<%#
+name: Convert2RHEL analyze
+snippet: false
+template_inputs:
+- name: ELS
+  required: false
+  input_type: user
+  description: Use an Extended Lifecycle Support (ELS) add-on subscription
+  options: "yes\r\nno"
+  advanced: false
+  value_type: plain
+  default: 'no'
+  hidden_value: false
+model: JobTemplate
+job_category: Convert 2 RHEL
+provider_type: script
+kind: job_template
+organizations:
+- LSST
+locations:
+- BDC
+%>
+
+<%-
+  els = input('ELS') == "yes" ? "--els" : ""
+-%>
+<% if @host.operatingsystem.family == 'Redhat' -%>
+if ! [ $(id -u) -eq 0 ]; then
+  echo "You must run convert2rhel as a root user."
+  exit 1
+fi
+
+if ! rpm -q convert2rhel &> /dev/null; then
+  yum install -y convert2rhel
+fi
+
+export CONVERT2RHEL_THROUGH_FOREMAN=1
+
+/usr/bin/convert2rhel analyze -y <%= els %>
+
+# Workaround for https://issues.redhat.com/browse/RHELC-1280
+subscription-manager facts --update
+
+if grep -q ERROR /var/log/convert2rhel/convert2rhel-pre-conversion.json; then
+    echo "Error: Some error(s) have been found."
+    echo "Exiting ..."
+    exit 1
+fi
+
+<% else %>
+echo 'Unsupported OS, it must be from the Red Hat family.'
+exit 1
+<% end -%>

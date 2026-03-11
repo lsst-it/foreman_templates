@@ -1,0 +1,17 @@
+<%#
+name: foreman_raw_ca
+description: This template exposes the CA certificate to be consumed directly from
+  a URL.
+snippet: false
+model: ProvisioningTemplate
+kind: public
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+organizations:
+- LSST
+locations:
+- BDC
+-%>
+<%= foreman_server_ca_cert -%>
