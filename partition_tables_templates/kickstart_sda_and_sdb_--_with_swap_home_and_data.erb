@@ -1,0 +1,34 @@
+<%#
+kind: ptable
+name: Kickstart sda+sdb AlmaLinux9 comcam-db02 style
+model: Ptable
+oses:
+- AlmaLinux
+- CentOS
+- CentOS_Stream
+- Fedora
+- RedHat
+- Rocky
+%>
+#Dynamic
+SHORT=$(hostname -s | tr '-' '_')
+BOOT_VG="almalinux_${SHORT}"
+DATA_VG="data"
+BOOT_DEV="/dev/sda"
+DATA_DEV="/dev/sdb"
+
+cat <<EOF > /tmp/diskpart.cfg
+ignoredisk --only-use=${BOOT_DEV},${DATA_DEV}
+zerombr
+clearpart --drives=${BOOT_DEV},${DATA_DEV} --all --initlabel --disklabel=gpt
+part /boot/efi --size=600   --asprimary --ondrive=${BOOT_DEV} --fstype=efi
+part /boot     --size=1024  --asprimary --ondrive=${BOOT_DEV} --fstype=xfs
+part pv.boot   --size=1     --grow      --ondisk=${BOOT_DEV}
+part pv.data   --size=1     --grow      --ondisk=${DATA_DEV}
+volgroup ${BOOT_VG} pv.boot
+volgroup ${DATA_VG} pv.data
+logvol /       --vgname=${BOOT_VG} --size=51200 --name=root --fstype=xfs
+logvol swap    --vgname=${BOOT_VG} --size=31744 --name=swap --fstype=swap
+logvol /home   --vgname=${BOOT_VG} --size=1 --grow --name=home --fstype=xfs
+logvol /data   --vgname=${DATA_VG} --size=1 --grow --name=data1 --fstype=xfs
+EOF
